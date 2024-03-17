@@ -41,20 +41,20 @@ gibbs_pmmh <- function(data, P, Ntotal, burnin, thin) {
   ESS_min <- P / 2
   
   # Storage
-  x <- array(rep(NA, Ntotal*TT*P), dim = c(TT, P, Ntotal))
+  x <- array(rep(NA, Ntotal*TT*P), dim = c(P, TT, Ntotal))
   rho <- rep(NA, Ntotal)
   sigma_x <- rep(NA, Ntotal)
   sigma_y <- rep(NA, Ntotal)
-  w <- matrix(rep(NA, Ntotal*P), ncol = Ntotal)
+  w <- matrix(rep(NA, TT*P), ncol = TT)
   v <- rep(NA, P)
   
   # Initialisation
-  x[,,1] <- 0
-  rho[1] <- 0
-  sigma_x[1] <- 1
-  sigma_x[1] <- 1
-  w[,1] <- rep(1, P)
-  W <- rep(1/P, P)
+  x_0 <- rep(0, P)
+  rho_0 <- 0
+  sigma_x_0 <- 1
+  sigma_x_0 <- 1
+  w_0 <- rep(1, P)
+  W_0 <- rep(1/P, P)
   
   for (i in 1:Ntotal) {
     ## Normalisation constant initialisation
@@ -62,23 +62,35 @@ gibbs_pmmh <- function(data, P, Ntotal, burnin, thin) {
       # Bootstrap PF - Algorithm 10.4 in Chopin & Papaspiliopoulous (2020)
       L_current <- 1
       for (j in 1:TT) {
-        ESS <- (sum(w[,i]))^2 / sum((w[,i])^2)
-        if (ESS < ESS_min) {
-          ## Resampling
-          U <- runif(1, 0, 1)
-          A <- Sys_resamp(W, P, U)
-          w_star <- rep(1, P)  
+        if (j == 1) {
+          x[,j,i] <- x_0[A] * rho_0 + rnorm(P, 0, sigma_x_0)
+          for (jj in 1:P) {
+            w[jj,j] <- w_0[jj] * dnorm(x[jj,j,i], sigma_y_0)
+          }
+          W <- w[,j] / sum(w[,j])
+          L_current <- L_current * sum(w[,j]) / sum(w_0) ## l_t follows (10.3) in Chopin & Papaspiliopoulous (2020)
         } else {
-          A <- 1:P
-          w_star <- w[,j]
+          ESS <- (sum(w[,j-1]))^2 / sum((w[,j-1])^2)  
+          if (ESS < ESS_min) {
+            ## Resampling
+            U <- runif(1, 0, 1)
+            A <- Sys_resamp(W, P, U)
+            w_star <- rep(1, P)  
+          } else {
+            A <- 1:P
+            w_star <- w[,j-1]
+          }
+          x[,j,i] <- x[,j-1,i][A] * rho_0 + rnorm(P, 0, sigma_x_0)
+          for (jj in 1:P) {
+            w[jj,j] <- w[jj,j-1] * dnorm(x[jj,j,i], sigma_y_0)
+          }
+          W <- w[,j] / sum(w[,j])
+          L_current <- L_current * mean(w[,j]) ## l_t follows (10.3) in Chopin & Papaspiliopoulous (2020)
         }
-        w_sum <- sum(w[,j+1])
-        W[,j+1] <- W[,j+1] / w_sum
-        L_current <- L_current * mean(w[,j+1])
-      } 
+      }
     }
     
-    ## Proposals
+    ## Proposals -- all Normal random walk
     rho_star <- rho[i] + rnorm(0, 1)
     sigma_x_star <- sigma_x[i] + rnorm(0, 1)
     sigma_y_star <- sigma_y[i] + rnorm(0, 1)
@@ -109,21 +121,37 @@ gibbs_pmmh <- function(data, P, Ntotal, burnin, thin) {
     }
     
     ## Posteriors
-    p_num_log <- dnorm(rho_star,0,1,log=T) + dnorm(sigma_x_star,0,1,log=T) + dnorm(sigma_y_star,0,1,log=T)
-              + log(L_prop) + dnorm(rho_[i],rho_star,1,log=T) + dnorm(sigma_x[i], sigma_x_star,1,log=T)
-              + dnorm(sigma_y[i],sigma_y_star,1,log=T)
-    p_den_log <- dnorm(rho[i],0,1,log=T) + dnorm(sigma_x[i],0,1,log=T) + dnorm(sigma_y[i],0,1,log=T)
-              + log(L_current) + dnorm(rho_star,rho_[i],1,log=T) + dnorm(sigma_x_star,sigma_x[i],1,log=T)
-              + dnorm(sigma_y_star,sigma_y[i],1,log=T)
+    p_num_log <- log(L_prop) + dnorm(rho_[i],rho_star,1,log=T) + dnorm(sigma_x[i], sigma_x_star,1,log=T)
+      + dnorm(sigma_y[i],sigma_y_star,1,log=T)
+    p_den_log <- dlog(L_current) + dnorm(rho_star,rho_[i],1,log=T) + dnorm(sigma_x_star,sigma_x[i],1,log=T)
+      + dnorm(sigma_y_star,sigma_y[i],1,log=T)
+    
     ## Accept/reject
-    alpha <- min(0, p_num_log - p_den_log)
+    alpha <- min(0, p_num_log - p_den_log) # Normal random walk - sysmetric proposals
     if (log(runif(1, 0, 1)) < alpha) {
-      x
+      x[,i+1] <- x_star[,P]
+      rho[i+1] <- rho_star
+      sigma_x[i+1] <- sigma_x_star
+      sigma_y[i+1] <- sigma_y_star
+      L_current <- L_prop
+    } else {
+      x[,i+1] <- x[,i]
+      rho[i+1] <- rho[i]
+      sigma_x[i+1] <- sigma_x[i]
+      sigma_y[i+1] <- sigma_y[i]
     }
   }
   
   
 }
+
+
+
+
+
+
+
+
 
 
 
