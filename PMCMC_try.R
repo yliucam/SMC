@@ -37,7 +37,7 @@ Sys_resamp <- function(W, P, U) {
 
 
 gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
-  TT <- 3
+  TT <- 100
   ESS_min <- P / 2
   
   # Storage
@@ -54,10 +54,8 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
   sigma_y_0 <- 1
   w_0 <- rep(1, P)
   
-  W_bug <- matrix(rep(0, P*TT), ncol=TT)
-  A_bug <- matrix(rep(NA, P*TT), ncol=TT)
   
-  for (i in 1:Ntotal) {
+  for (i in 1:(Ntotal-1)) {
     ## Normalisation constant initialisation
     if (i == 1) {
       # Bootstrap PF - Algorithm 10.4 in Chopin & Papaspiliopoulous (2020)
@@ -96,104 +94,111 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
             L_current <- L_current * sum(w[,j]) / sum(w_star)
           }
         }
-        
       }
       
       rho[i] <- rho_0
       sigma_x[i] <- sigma_x_0
       sigma_y[i] <- sigma_y_0
       
-    } else {
-      ## Proposals 
-      rho_star <- rho[i-1] + rnorm(1, 0, 1)
-      sigma_x_star <- rlnorm(1, log(sigma_x[i-1]), 1) ## Log-normal proposal for scales
-      sigma_y_star <- rlnorm(1, log(sigma_y[i-1]), 1) ##
+    }
       
-      x_star <- matrix(rep(NA, TT*P), ncol = TT)
+    ## Proposals 
+    rho_star <- rho[i] + rnorm(1, 0, 1)
+    sigma_x_star <- rlnorm(1, log(sigma_x[i]), 1) ## Log-normal proposal for scales
+    sigma_y_star <- rlnorm(1, log(sigma_y[i]), 1) ##
       
-      L_prop <- 1
+    x_star <- matrix(rep(NA, TT*P), ncol = TT)
       
-      ESS_bug <- rep(0, TT)
+    L_prop <- 1
       
-      A_bug <- matrix(rep(0, TT*P), ncol=TT)
       
-      # Bootstrap PF
-      t <- 1
-      while (t <= (TT-1)) {
-        if (t == 1) {
-          ESS <- (sum(w[,t]))^2 / sum((w[,t])^2)
-          ESS_bug[t] <- ESS
-          if (ESS < ESS_min) {
-            ## Resampling
-            U <- runif(1, 0, 1)
-            A <- Sys_resamp(W, P, U)
-            w_star <- rep(1, P)
-          } else {
-            A <- 1:P
-            w_star <- w[,t]
-          }
-          A_bug[,t] <- A
-          x_star[,t] <- x[A,t,i-1] * rho_star + rnorm(P, 0, sigma_x_star)
-          for (jj in 1:P) {
-            w[jj,t] <- w_star[jj] * dnorm(x_star[jj,t], sigma_y_star)
-          }
-          W <- w[,t] /sum(w[,t])
-          if (ESS < ESS_min) {
-            L_prop <- L_prop * mean(w[,t])
-          } else {
-            L_prop <- L_prop * sum(w[,t]) / sum(w_star)  
-          }
+    # Bootstrap PF
+    for (j in 1:(TT-1)) {
+      if (j == 1) {
+        ## Ensure ESS is not NaN -- dangerous, need to change
+        if (((sum(w[,j]))^2==0)&&(sum((w[,j])^2)==0)) {
+          ESS <- 0
+        } else {
+          ESS <- (sum(w[,j]))^2 / sum((w[,j])^2)  
         }
-          ESS <- (sum(w[,t]))^2 / sum((w[,t])^2) 
-          ESS_bug[t+1] <- ESS
-          if (ESS < ESS_min) {
-            ## Resampling
-            U <- runif(1, 0, 1)
-            A <- Sys_resamp(W=W, P=P, U=U)
-            w_star <- rep(1, P)
-          } else {
-            A <- 1:P
-            w_star <- w[,t]
-          }
-          A_bug[,t+1] <- A
-          x_star[,t+1] <- x_star[A,t] * rho_star + rnorm(P, 0, sigma_x_star)
-          for (jj in 1:P) {
-            w[jj,t+1] <- w_star[jj] * dnorm(x_star[jj,t+1], sigma_y_star)
-          }
-          W1 <- w[,t+1] / sum(w[,t+1])
-          #if (ESS < ESS_min) {
-          #  L_prop <- L_prop * mean(w[,t+1])
-          #} else {
-          #  L_prop <- L_prop * sum(w[,t+1]) / sum(w_star)
-          #}
-          tryCatch(stop({t <- t+1}), error=function(x) x, finally=return(x_star))
+        if (ESS < ESS_min) {
+          ## Resampling
+          U <- runif(1, 0, 1)
+          A <- Sys_resamp(W, P, U)
+          w_star <- rep(1, P)
+        } else {
+          A <- 1:P
+          w_star <- w[,j]
+        }
+        x_star[,j] <- x[A,j,i] * rho_star + rnorm(P, 0, sigma_x_star)
+        for (jj in 1:P) {
+          w[jj,j] <- w_star[jj] * dnorm(x_star[jj,j], sigma_y_star)
+        }
+        W <- w[,j] /sum(w[,j])
+        if (ESS < ESS_min) {
+          L_prop <- L_prop * mean(w[,j])
+        } else {
+          L_prop <- L_prop * sum(w[,j]) / sum(w_star)  
+        }
       }
-      
-      # MH sampling
-      ## Posteriors
-      p_num_log <- log(L_prop) + dnorm(rho_star,0,1,log=T) + dlnorm(sigma_x_star,0,1,log=T)
-                                  + dlnorm(sigma_y_star,0,1,log=T)
-      p_den_log <- log(L_current) + dnorm(rho[i-1],0,1,log=T) + dlnorm(sigma_x[i-1],0,1,log=T)
-                                    + dlnorm(sigma_y[i-1],0,1,log=T)
-      
-      ## Jacobians for sigma_x and sigma_y
-      Jacob_x_log <- -log(sigma_x[i-1]) - (-log(sigma_x_star))
-      Jacob_y_log <- -log(sigma_y[i-1]) - (-log(sigma_y_star))
-      
-      ## Accept/reject
-      alpha <- min(0, p_num_log - p_den_log + Jacob_x_log + Jacob_y_log)
-      if (log(runif(1, 0, 1)) < alpha) {
-        x[,,i] <- x_star
-        rho[i] <- rho_star
-        sigma_x[i] <- sigma_x_star
-        sigma_y[i] <- sigma_y_star
-        L_current <- L_prop
+      ## Ensure ESS is not NaN -- dangerous, need to change
+      if (((sum(w[,j]))^2==0)&&(sum((w[,j])^2)==0)) {
+        ESS <- 0
       } else {
-        x[,,i] <- x[,,i-1]
-        rho[i] <- rho[i-1]
-        sigma_x[i] <- sigma_x[i-1]
-        sigma_y[i] <- sigma_y[i-1]
+        ESS <- (sum(w[,j]))^2 / sum((w[,j])^2)  
       }
+      if (ESS < ESS_min) {
+        ## Resampling
+        U <- runif(1, 0, 1)
+        A <- Sys_resamp(W=W, P=P, U=U)
+        w_star <- rep(1, P)
+      } else {
+        A <- 1:P
+        w_star <- w[,j]
+      }
+      x_star[,j+1] <- x_star[A,j] * rho_star + rnorm(P, 0, sigma_x_star)
+      for (jj in 1:P) {
+        w[jj,j+1] <- w_star[jj] * dnorm(x_star[jj,j+1], sigma_y_star)
+      }
+      ## Ensure W is not NaN -- dangerous, need to change
+      if (sum(w[,j+1]) == 0) {
+        W <- rep(1/P, P)
+      } else {
+        W <- w[,j+1] / sum(w[,j+1])  
+      }
+      
+      if (ESS < ESS_min) {
+        L_prop <- L_prop * mean(w[,j+1])
+      } else {
+        L_prop <- L_prop * sum(w[,j+1]) / sum(w_star)
+      }
+  
+    }
+      
+    # MH sampling
+    ## Posteriors
+    p_num_log <- log(L_prop) + dnorm(rho_star,0,1,log=T) + dlnorm(sigma_x_star,0,1,log=T)
+    + dlnorm(sigma_y_star,0,1,log=T)
+    p_den_log <- log(L_current) + dnorm(rho[i],0,1,log=T) + dlnorm(sigma_x[i],0,1,log=T)
+    + dlnorm(sigma_y[i],0,1,log=T)
+      
+    ## Jacobians for sigma_x and sigma_y
+    Jacob_x_log <- -log(sigma_x[i]) - (-log(sigma_x_star))
+    Jacob_y_log <- -log(sigma_y[i]) - (-log(sigma_y_star))
+      
+    ## Accept/reject
+    alpha <- min(0, p_num_log - p_den_log + Jacob_x_log + Jacob_y_log)
+    if (log(runif(1, 0, 1)) < alpha) {
+      x[,,i+1] <- x_star
+      rho[i+1] <- rho_star
+      sigma_x[i+1] <- sigma_x_star
+      sigma_y[i+1] <- sigma_y_star
+      L_current <- L_prop
+    } else {
+      x[,,i+1] <- x[,,i]
+      rho[i+1] <- rho[i]
+      sigma_x[i+1] <- sigma_x[i]
+      sigma_y[i+1] <- sigma_y[i]
     }
   }
   
@@ -205,20 +210,3 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
               sigma_x=sigma_x[keep],
               sigma_y=sigma_y[keep]))
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
