@@ -37,7 +37,7 @@ Sys_resamp <- function(W, P, U) {
 
 
 gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
-  TT <- 100
+  TT <- length(data)
   ESS_min <- P / 2
   
   # Storage
@@ -177,10 +177,12 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
       
     # MH sampling
     ## Posteriors
-    p_num_log <- log(L_prop) + dnorm(rho_star,0,1,log=T) + dlnorm(sigma_x_star,0,1,log=T)
-    + dlnorm(sigma_y_star,0,1,log=T)
-    p_den_log <- log(L_current) + dnorm(rho[i],0,1,log=T) + dlnorm(sigma_x[i],0,1,log=T)
-    + dlnorm(sigma_y[i],0,1,log=T)
+    p_num_log <- log(L_prop) + dunif(rho_star, -1, 1, log = T) 
+                    + log(2/(3*sigma_x_star^5)*exp(-2/sigma_x_star^2))
+                      + log(2/(3*sigma_y_star^5)*exp(-2/sigma_y_star^2))
+    p_den_log <- log(L_current) + dunif(rho[i], -1, 1, log = T) 
+                    + log(2/(3*sigma_x[i]^5)*exp(-2/sigma_x[i]^2))
+                      + log(2/(3*sigma_y[i]^5)*exp(-2/sigma_y[i]^2))
       
     ## Jacobians for sigma_x and sigma_y
     Jacob_x_log <- -log(sigma_x[i]) - (-log(sigma_x_star))
@@ -210,3 +212,5 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
               sigma_x=sigma_x[keep],
               sigma_y=sigma_y[keep]))
 }
+
+
