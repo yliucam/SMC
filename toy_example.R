@@ -52,8 +52,8 @@ traceplot(out_mcmc[,'sig2_x_inv'])
 traceplot(out_mcmc[,'sig2_y_inv'])
 traceplot(out_mcmc[,'x[100]'])
 hist(out_mcmc[,'rho'])
-hist(sqrt(1/out_mcmc[,'sig2_x_inv']**2))
-hist(sqrt(1/out_mcmc[,'sig2_y_inv']**2))
+hist(sqrt(1/out_mcmc[,'sig2_x_inv']))
+hist(sqrt(1/out_mcmc[,'sig2_y_inv']))
 hist(out_mcmc[,'x[100]'])
 
 
@@ -91,17 +91,11 @@ nimble_mcmc <- compileNimble(nimble_model, nimble_MCMC, resetFunctions = T)
 
 nimble_mcmc$nimble_MCMC$run(10000)
 
+nimble_post <- as.mcmc(as.matrix(nimble_mcmc$nimble_MCMC$mvSamples)[5001:10000,])
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+traceplot(nimble_post[,'rho'])
+traceplot(sqrt(1/nimble_post[,'sig2_x_inv']))
+traceplot(sqrt(1/nimble_post[,'sig2_y_inv']))
+hist(nimble_post[,'rho'])
+hist(sqrt(1/nimble_post[,'sig2_x_inv']))
+hist(sqrt(1/nimble_post[,'sig2_y_inv']))
