@@ -1,15 +1,15 @@
-u <- rnorm(100, 0, 1)
-v <- rnorm(100, 0, .2)
+# To do -- Try a (much) smaller T
+
 
 x <- rep(NA, 100)
 x[1] <- rnorm(1, 0, 1)
 for (i in 2:100) {
-  x[i] <- x[i-1] * .9 + u[i]
+  x[i] <- rnorm(1, x[i-1]*.9, 1)
 }
 
 y <- rep(NA, 100)
 for (i in 1:100) {
-  y[i] <- x[i] + v[i]
+  y[i] <- rnorm(1, x[i], .2)
 }
 
 
@@ -36,7 +36,7 @@ Sys_resamp <- function(W, P, U) {
 
 
 
-gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
+gibbs_pmmc <- function(data, P, Ntotal, burnin, thin, print_interval=100) {
   TT <- length(data)
   ESS_min <- P / 2
   
@@ -64,14 +64,24 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
         if (j == 1) {
           x[,j,i] <- x_0 * rho_0 + rnorm(P, 0, sigma_x_0)
           for (jj in 1:P) {
-            w[jj,j] <- w_0[jj] * dnorm(x[jj,j,i], sigma_y_0)
+            w[jj,j] <- w_0[jj] * dnorm(data[j], x[jj,j,i], sigma_y_0) * 1e2
           }
-          W <- w[,j] / sum(w[,j])
+          ## Ensure W is not NaN -- dangerous, need to change
+          if (sum(w[,j]) == 0) {
+            W <- rep(1/P, P)
+          } else {
+            W <- w[,j] / sum(w[,j])  
+          }
           ## The likelihood is updated following (10.3) in Chopin & Papaspiliopoulous (2020)
           ## No resampling occurs here
           L_current <- L_current * sum(w[,j]) / sum(w_0)
         } else {
-          ESS <- (sum(w[,j-1]))^2 / sum((w[,j-1])^2)  
+          ## Ensure ESS is not NaN -- dangerous, need to change
+          if (((sum(w[,j-1]))^2==0)&&(sum((w[,j-1])^2)==0)) {
+            ESS <- 0
+          } else {
+            ESS <- (sum(w[,j-1]))^2 / sum((w[,j-1])^2)  
+          }
           if (ESS < ESS_min) {
             ## Resampling
             U <- runif(1, 0, 1)
@@ -83,9 +93,14 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
           }
           x[,j,i] <- x[,j-1,i][A] * rho_0 + rnorm(P, 0, sigma_x_0)
           for (jj in 1:P) {
-            w[jj,j] <- w_star[jj] * dnorm(x[jj,j,i], sigma_y_0) ## (10.4b) in Chopin & Papaspiliopoulous (2020)
+            w[jj,j] <- w_star[jj] * dnorm(data[j], x[jj,j,i], sigma_y_0) * 1e2 ## (10.4b) in Chopin & Papaspiliopoulous (2020)
           }
-          W <- w[,j] / sum(w[,j])
+          ## Ensure W is not NaN -- dangerous, need to change
+          if (sum(w[,j]) == 0) {
+            W <- rep(1/P, P)
+          } else {
+            W <- w[,j] / sum(w[,j])  
+          }
           ## The likelihood is updated following (10.3) in Chopin & Papaspiliopoulous (2020)
           ## The update depends on whether resampling occurs at time j
           if (ESS < ESS_min) {
@@ -103,9 +118,9 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
     }
       
     ## Proposals 
-    rho_star <- rho[i] + rnorm(1, 0, 1)
-    sigma_x_star <- rlnorm(1, log(sigma_x[i]), 1) ## Log-normal proposal for scales
-    sigma_y_star <- rlnorm(1, log(sigma_y[i]), 1) ##
+    rho_star <- rho[i] + rnorm(1, 0, .05)
+    sigma_x_star <- rlnorm(1, log(sigma_x[i]), .05) ## Log-normal proposal for scales
+    sigma_y_star <- rlnorm(1, log(sigma_y[i]), .05) ##
       
     x_star <- matrix(rep(NA, TT*P), ncol = TT)
       
@@ -132,9 +147,14 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
         }
         x_star[,j] <- x[A,j,i] * rho_star + rnorm(P, 0, sigma_x_star)
         for (jj in 1:P) {
-          w[jj,j] <- w_star[jj] * dnorm(x_star[jj,j], sigma_y_star)
+          w[jj,j] <- w_star[jj] * dnorm(data[j], x_star[jj,j], sigma_y_star) * 1e2
         }
-        W <- w[,j] /sum(w[,j])
+        ## Ensure W is not NaN -- dangerous, need to change
+        if (sum(w[,j+1]) == 0) {
+          W <- rep(1/P, P)
+        } else {
+          W <- w[,j+1] / sum(w[,j+1])  
+        }
         if (ESS < ESS_min) {
           L_prop <- L_prop * mean(w[,j])
         } else {
@@ -158,7 +178,7 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
       }
       x_star[,j+1] <- x_star[A,j] * rho_star + rnorm(P, 0, sigma_x_star)
       for (jj in 1:P) {
-        w[jj,j+1] <- w_star[jj] * dnorm(x_star[jj,j+1], sigma_y_star)
+        w[jj,j+1] <- w_star[jj] * dnorm(data[j], x_star[jj,j+1], sigma_y_star) * 1e2
       }
       ## Ensure W is not NaN -- dangerous, need to change
       if (sum(w[,j+1]) == 0) {
@@ -178,11 +198,11 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
     # MH sampling
     ## Posteriors
     p_num_log <- log(L_prop) + dunif(rho_star, -1, 1, log = T) 
-                    + log(2/(3*sigma_x_star^5)*exp(-2/sigma_x_star^2))
-                      + log(2/(3*sigma_y_star^5)*exp(-2/sigma_y_star^2))
+                    + dgamma(sigma_x_star^2, .5, .5, log = T)
+                      + dgamma(sigma_y_star^2, .5, .5, log = T)
     p_den_log <- log(L_current) + dunif(rho[i], -1, 1, log = T) 
-                    + log(2/(3*sigma_x[i]^5)*exp(-2/sigma_x[i]^2))
-                      + log(2/(3*sigma_y[i]^5)*exp(-2/sigma_y[i]^2))
+                    + dgamma(sigma_x[i]^2, .5, .5, log = T)
+                      + dgamma(sigma_y[i]^2, .5, .5, log = T)
       
     ## Jacobians for sigma_x and sigma_y
     Jacob_x_log <- -log(sigma_x[i]) - (-log(sigma_x_star))
@@ -202,6 +222,8 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
       sigma_x[i+1] <- sigma_x[i]
       sigma_y[i+1] <- sigma_y[i]
     }
+    
+    if (i%%print_interval == 0) print(paste0('MCMC iterations ', i, '/', Ntotal))
   }
   
   
@@ -212,5 +234,36 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin) {
               sigma_x=sigma_x[keep],
               sigma_y=sigma_y[keep]))
 }
+
+
+
+out_pmcmc <- gibbs_pmmc(data = y, P = 100, Ntotal = 10000, burnin = 5000, thin = 2, print_interval = 1000)
+
+
+hist(out_pmcmc$rho, breaks = 30)
+hist(out_pmcmc$sigma_x, breaks = 30)
+hist(out_pmcmc$sigma_y, breaks = 30)
+
+library(coda)
+
+traceplot(as.mcmc(out_pmcmc$rho))
+traceplot(as.mcmc(out_pmcmc$sigma_x))
+traceplot(as.mcmc(out_pmcmc$sigma_y))
+
+
+mean(out_pmcmc$rho)
+median(out_pmcmc$rho)
+
+mean(out_pmcmc$sigma_x)
+median(out_pmcmc$sigma_x)
+
+mean(out_pmcmc$sigma_y)
+median(out_pmcmc$sigma_y)
+
+
+
+
+
+
 
 
