@@ -45,68 +45,91 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin, print_interval=100) {
   rho <- rep(NA, Ntotal)
   sigma_x <- rep(NA, Ntotal)
   sigma_y <- rep(NA, Ntotal)
-  w <- matrix(rep(NA, TT*P), ncol = TT)
+  w_log <- matrix(rep(NA, TT*P), ncol = TT)
   
   # Initialisation
   x_0 <- rep(0, P)
   rho_0 <- 0
   sigma_x_0 <- 1
   sigma_y_0 <- 1
-  w_0 <- rep(1, P)
+  w_log_0 <- rep(0, P)
   
   
   for (i in 1:(Ntotal-1)) {
     ## Normalisation constant initialisation
     if (i == 1) {
       # Bootstrap PF - Algorithm 10.4 in Chopin & Papaspiliopoulous (2020)
-      L_current <- 1
+      L_current_log <- 0
       for (j in 1:TT) {
         if (j == 1) {
           x[,j,i] <- x_0 * rho_0 + rnorm(P, 0, sigma_x_0)
           for (jj in 1:P) {
-            w[jj,j] <- w_0[jj] * dnorm(data[j], x[jj,j,i], sigma_y_0) * 1e2
+            w_log[jj,j] <- w_log_0[jj] + dnorm(data[j], x[jj,j,i], sigma_y_0, log = T)
           }
+          ## Obtain W -- apply LogSumExp() to avoid underflow
+          w_log_min <- min(w_log[,j])
+          w_sum <- sum(exp((w_log[,j])-w_log_min))
+          W_log <- w_log[,j] - w_log_min - log(w_sum)
+          W <- exp(W_log)
           ## Ensure W is not NaN -- dangerous, need to change
-          if (sum(w[,j]) == 0) {
-            W <- rep(1/P, P)
-          } else {
-            W <- w[,j] / sum(w[,j])  
-          }
+          #if (sum(w[,j]) == 0) {
+          #  W <- rep(1/P, P)
+          #} else {
+          #  W <- w[,j] / sum(w[,j])  
+          #}
           ## The likelihood is updated following (10.3) in Chopin & Papaspiliopoulous (2020)
           ## No resampling occurs here
-          L_current <- L_current * sum(w[,j]) / sum(w_0)
+          #L_current <- L_current * sum(w[,j]) / sum(w_0)
+          w_log_0_min <- min(w_log_0)
+          w_0_sum <- sum(exp(w_log_0-w_log_0_min))
+          L_current_log <- L_current_log + log(w_sum) + w_log_min - log(w_0_sum) - w_log_0_min
         } else {
+          ## Obtain ESS - apply LogSumExp() to avoid underflow
+          w_log_min <- min(w_log[,j-1])
+          w_sum <- sum(exp(w_log[,j-1]-w_log_min))
+          w_sum2 <- sum((exp(w_log[,j-1]-w_log_min))^2)
+          ESS_log <- 2*log(w_sum) - log(w_sum2)
+          ESS <- exp(ESS_log)
           ## Ensure ESS is not NaN -- dangerous, need to change
-          if (((sum(w[,j-1]))^2==0)&&(sum((w[,j-1])^2)==0)) {
-            ESS <- 0
-          } else {
-            ESS <- (sum(w[,j-1]))^2 / sum((w[,j-1])^2)  
-          }
+          #if (((sum(w[,j-1]))^2==0)&&(sum((w[,j-1])^2)==0)) {
+          #  ESS <- 0
+          #} else {
+          #  ESS <- (sum(w[,j-1]))^2 / sum((w[,j-1])^2)  
+          #}
           if (ESS < ESS_min) {
             ## Resampling
             U <- runif(1, 0, 1)
             A <- Sys_resamp(W=W, P=P, U=U)
-            w_star <- rep(1, P)  
+            w_log_star <- rep(0, P)  
           } else {
             A <- 1:P
-            w_star <- w[,j-1]
+            w_log_star <- w_log[,j-1]
           }
           x[,j,i] <- x[,j-1,i][A] * rho_0 + rnorm(P, 0, sigma_x_0)
           for (jj in 1:P) {
-            w[jj,j] <- w_star[jj] * dnorm(data[j], x[jj,j,i], sigma_y_0) * 1e2 ## (10.4b) in Chopin & Papaspiliopoulous (2020)
+            w_log[jj,j] <- w_log_star[jj] + dnorm(data[j], x[jj,j,i], sigma_y_0, log = T) ## (10.4b) in Chopin & Papaspiliopoulous (2020)
           }
+          ## Obtain W -- apply LogSumExp() to avoid underflow
+          w_log_min <- min(w_log[,j])
+          w_sum <- sum(exp(w_log[,j]-w_log_min))
+          W_log <- w_log[,j] - w_log_min - log(w_sum)
+          W <- exp(W_log)
           ## Ensure W is not NaN -- dangerous, need to change
-          if (sum(w[,j]) == 0) {
-            W <- rep(1/P, P)
-          } else {
-            W <- w[,j] / sum(w[,j])  
-          }
+          #if (sum(w[,j]) == 0) {
+          #  W <- rep(1/P, P)
+          #} else {
+          #  W <- w[,j] / sum(w[,j])  
+          #}
           ## The likelihood is updated following (10.3) in Chopin & Papaspiliopoulous (2020)
           ## The update depends on whether resampling occurs at time j
           if (ESS < ESS_min) {
-            L_current <- L_current * mean(w[,j]) 
+            #L_current <- L_current * mean(w[,j])
+            L_current_log <- L_current_log + log(w_sum) + w_log_min - log(P)
           } else {
-            L_current <- L_current * sum(w[,j]) / sum(w_star)
+            #L_current <- L_current * sum(w[,j]) / sum(w_star)
+            w_log_star_min <- min(w_log_star)
+            w_star_sum <- sum(exp(w_log_star-w_log_star_min))
+            L_current_log <- L_current_log + log(w_sum) + w_log_min - log(w_star_sum) - w_log_star_min
           }
         }
       }
@@ -124,83 +147,113 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin, print_interval=100) {
       
     x_star <- matrix(rep(NA, TT*P), ncol = TT)
       
-    L_prop <- 1
-      
+    #L_prop <- 1
+    L_prop_log <- 0  
       
     # Bootstrap PF
     for (j in 1:(TT-1)) {
       if (j == 1) {
+        ## Obtain ESS - apply LogSumExp() to avoid underflow
+        w_log_min <- min(w_log[,j])
+        w_sum <- sum(exp(w_log[,j]-w_log_min))
+        w_sum2 <- sum((exp(w_log[,j]-w_log_min))^2)
+        ESS_log <- 2*log(w_sum) - log(w_sum2)
+        ESS <- exp(ESS_log)
         ## Ensure ESS is not NaN -- dangerous, need to change
-        if (((sum(w[,j]))^2==0)&&(sum((w[,j])^2)==0)) {
-          ESS <- 0
-        } else {
-          ESS <- (sum(w[,j]))^2 / sum((w[,j])^2)  
-        }
+        #if (((sum(w[,j]))^2==0)&&(sum((w[,j])^2)==0)) {
+        #  ESS <- 0
+        #} else {
+        #  ESS <- (sum(w[,j]))^2 / sum((w[,j])^2)  
+        #}
         if (ESS < ESS_min) {
           ## Resampling
           U <- runif(1, 0, 1)
           A <- Sys_resamp(W, P, U)
-          w_star <- rep(1, P)
+          w_log_star <- rep(0, P)
         } else {
           A <- 1:P
-          w_star <- w[,j]
+          w_log_star <- w_log[,j]
         }
         x_star[,j] <- x[A,j,i] * rho_star + rnorm(P, 0, sigma_x_star)
         for (jj in 1:P) {
-          w[jj,j] <- w_star[jj] * dnorm(data[j], x_star[jj,j], sigma_y_star) * 1e2
+          w_log[jj,j] <- w_log_star[jj] + dnorm(data[j], x_star[jj,j], sigma_y_star, log = T)
         }
+        ## Obtain W -- apply LogSumExp() to avoid underflow
+        w_log_min <- min(w_log[,j])
+        w_sum <- sum(exp(w_log[,j]-w_log_min))
+        W_log <- w_log[,j] - w_log_min - log(w_sum)
+        W <- exp(W_log)
         ## Ensure W is not NaN -- dangerous, need to change
-        if (sum(w[,j+1]) == 0) {
-          W <- rep(1/P, P)
-        } else {
-          W <- w[,j+1] / sum(w[,j+1])  
-        }
+        #if (sum(w[,j]) == 0) {
+        #  W <- rep(1/P, P)
+        #} else {
+        #  W <- w[,j] / sum(w[,j])  
+        #}
         if (ESS < ESS_min) {
-          L_prop <- L_prop * mean(w[,j])
+          #L_prop <- L_prop * mean(w[,j])
+          L_prop_log <- L_prop_log + log(w_sum) + w_log_min - log(P)
         } else {
-          L_prop <- L_prop * sum(w[,j]) / sum(w_star)  
+          #L_prop <- L_prop * sum(w[,j]) / sum(w_star)
+          w_log_star_min <- min(w_log_star)
+          w_log_star_sum <- sum(exp(w_log_star-w_log_star_min))
+          L_prop_log <- L_prop_log + log(w_sum) + w_log_min - log(w_star_sum) - w_log_star_min
         }
       }
+      ## Obtain ESS - apply LogSumExp() to avoid underflow
+      w_log_min <- min(w_log[,j])
+      w_sum <- sum(exp(w_log[,j]-w_log_min))
+      w_sum2 <- sum((exp(w_log[,j]-w_log_min))^2)
+      ESS_log <- 2*log(w_sum) - log(w_sum2)
+      ESS <- exp(ESS_log)
       ## Ensure ESS is not NaN -- dangerous, need to change
-      if (((sum(w[,j]))^2==0)&&(sum((w[,j])^2)==0)) {
-        ESS <- 0
-      } else {
-        ESS <- (sum(w[,j]))^2 / sum((w[,j])^2)  
-      }
+      #if (((sum(w[,j]))^2==0)&&(sum((w[,j])^2)==0)) {
+      #  ESS <- 0
+      #} else {
+      #  ESS <- (sum(w[,j]))^2 / sum((w[,j])^2)  
+      #}
       if (ESS < ESS_min) {
         ## Resampling
         U <- runif(1, 0, 1)
         A <- Sys_resamp(W=W, P=P, U=U)
-        w_star <- rep(1, P)
+        w_log_star <- rep(0, P)
       } else {
         A <- 1:P
-        w_star <- w[,j]
+        w_log_star <- w_log[,j]
       }
       x_star[,j+1] <- x_star[A,j] * rho_star + rnorm(P, 0, sigma_x_star)
       for (jj in 1:P) {
-        w[jj,j+1] <- w_star[jj] * dnorm(data[j], x_star[jj,j+1], sigma_y_star) * 1e2
+        w_log[jj,j+1] <- w_log_star[jj] + dnorm(data[j], x_star[jj,j+1], sigma_y_star, log=T)
       }
+      ## Obtain W -- apply LogSumExp() to avoid underflow
+      w_log_min <- min(w_log[,j+1])
+      w_sum <- sum(exp(w_log[,j+1]-w_log_min))
+      W_log <- w_log[,j+1] - w_log_min - log(w_sum)
+      W <- exp(W_log)
       ## Ensure W is not NaN -- dangerous, need to change
-      if (sum(w[,j+1]) == 0) {
-        W <- rep(1/P, P)
-      } else {
-        W <- w[,j+1] / sum(w[,j+1])  
-      }
+      #if (sum(w[,j+1]) == 0) {
+      #  W <- rep(1/P, P)
+      #} else {
+      #  W <- w[,j+1] / sum(w[,j+1])  
+      #}
       
       if (ESS < ESS_min) {
-        L_prop <- L_prop * mean(w[,j+1])
+        #L_prop <- L_prop * mean(w[,j+1])
+        L_prop_log <- L_prop_log + log(w_sum) + w_log_min - log(P)
       } else {
-        L_prop <- L_prop * sum(w[,j+1]) / sum(w_star)
+        #L_prop <- L_prop * sum(w[,j+1]) / sum(w_star)
+        w_log_star_min <- min(w_log_star)
+        w_star_sum <- sum(exp(w_log_star-w_log_star_min))
+        L_prop_log <- L_prop_log + log(w_sum) + w_log_min - log(w_star_sum) - w_log_star_min
       }
   
     }
       
     # MH sampling
     ## Posteriors
-    p_num_log <- log(L_prop) + dunif(rho_star, -1, 1, log = T) 
+    p_num_log <- L_prop_log + dunif(rho_star, -1, 1, log = T) 
                     + dgamma(sigma_x_star^2, .5, .5, log = T)
                       + dgamma(sigma_y_star^2, .5, .5, log = T)
-    p_den_log <- log(L_current) + dunif(rho[i], -1, 1, log = T) 
+    p_den_log <- L_current_log + dunif(rho[i], -1, 1, log = T) 
                     + dgamma(sigma_x[i]^2, .5, .5, log = T)
                       + dgamma(sigma_y[i]^2, .5, .5, log = T)
       
@@ -215,7 +268,7 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin, print_interval=100) {
       rho[i+1] <- rho_star
       sigma_x[i+1] <- sigma_x_star
       sigma_y[i+1] <- sigma_y_star
-      L_current <- L_prop
+      L_current_log <- L_prop_log
     } else {
       x[,,i+1] <- x[,,i]
       rho[i+1] <- rho[i]
@@ -237,18 +290,25 @@ gibbs_pmmc <- function(data, P, Ntotal, burnin, thin, print_interval=100) {
 
 
 
+
 out_pmcmc <- gibbs_pmmc(data = y, P = 100, Ntotal = 10000, burnin = 5000, thin = 2, print_interval = 1000)
 
 
+pdf('pmcmc_01.pdf', width = 20, height = 10, onefile = F)
+
+par(mfrow=c(2,3))
+
 hist(out_pmcmc$rho, breaks = 30)
-hist(out_pmcmc$sigma_x, breaks = 30)
-hist(out_pmcmc$sigma_y, breaks = 30)
+hist((out_pmcmc$sigma_x)^2, breaks = 30)
+hist((out_pmcmc$sigma_y)^2, breaks = 30)
 
 library(coda)
 
 traceplot(as.mcmc(out_pmcmc$rho))
-traceplot(as.mcmc(out_pmcmc$sigma_x))
-traceplot(as.mcmc(out_pmcmc$sigma_y))
+traceplot(as.mcmc((out_pmcmc$sigma_x)^2))
+traceplot(as.mcmc((out_pmcmc$sigma_y)^2))
+
+dev.off()
 
 
 mean(out_pmcmc$rho)
@@ -259,6 +319,8 @@ median(out_pmcmc$sigma_x)
 
 mean(out_pmcmc$sigma_y)
 median(out_pmcmc$sigma_y)
+
+
 
 
 
