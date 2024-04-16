@@ -21,7 +21,11 @@ dc_smc <- function() {
     w_log[1,i] <- w_log_0 + sum(apply(data[,c_i], 1, function(y) dnorm(y, x_ci[1,i], 1, log = T)))
     for (j in 2:P) {
       x_ci[j,i] <- x_ci[j-1,i] + rnorm(1, 0, 1)
-      
+      w_log[j,i] <- w_log[j-1,i] + sum(apply(data[,c_i], 1, function(y) dnorm(y, x_ci[j,i], 1, log = T)))
+    }
+    ## Resampling mP particles
+    for (jj in 1:m) {
+      A <- rep(NA, )
     }
   }
 }
