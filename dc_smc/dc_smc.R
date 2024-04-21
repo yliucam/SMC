@@ -20,6 +20,7 @@ dc_smc <- function(data, P, nt) {
   # Initialization
   x_0 <- rep(0, n_n)
   w_log_0 <- 0
+  L_c_prod_log <- 0
   
   for (c_i in 1:n_n) {
     x_ci <- x[,c_i]
@@ -41,13 +42,18 @@ dc_smc <- function(data, P, nt) {
     #  A <- Sys_resamp(W, P, U)
     #  x_mP[((jj-1)*P+1):(jj*P), c_i] <- x_ci[A,i]
     #}
+    
+    ## Update the marginal likelihood
+    L_c_prod_log <- L_c_prod_log + log(sum(exp(w_log[,c_i]))) - log(P)
   }
   
   
   
-  # Propose x_t from q_t(|x_c1, x_c2,...). Not consider \tilde{X}_t is empty for now
-  ## How? Use a conjugate distribution with mean of (x_c1, x_c2,...)?
-  x_t_tilde <- rowMeans(x) + rnorm(P, 0, 1) ## Using a Normal random walk centered on the mean of x_c1, x_c2,...
+  # Propose x_t from q_t(|x_c1, x_c2,...). 
+  ## Choose q_t to be u_t, the prior for \tilde{x}_t
+  ## Select u_t as a conjugate prior to p(x_c|\tilde{x}_t) ~ N(\tilde{x}_t, 1).
+  ## Due to above, we choose u_t ~ N(0, 1). Then q_t ~ N((x_c1+x_c2+...)/(1+n_n), 1/(1+n_n)).
+  x_t_tilde <- rowSums(x)/(1+n_n) + sqrt(1/(1+n_n)) * rnorm(P, 0, 1)
   
   # Sampler steps
   
@@ -58,6 +64,7 @@ dc_smc <- function(data, P, nt) {
   ## Initialization
   x_sampler_0 <- x_t_tilde
   w_sampler_log_0 <- 0
+  L_prod_log <- 0
   
   ## Sampler iterations
   for (s_i in 1:(nt-1)) {
@@ -75,6 +82,9 @@ dc_smc <- function(data, P, nt) {
       
       ### Proposals
       x_sampler[,s_i] <- x_sampler_0 + rnorm(P, 0, 1)
+      
+      ### Update the marginal likelihood
+      L_prod_log <- L_prod_log + L_c_prod_log
     }
     
     for (j in 1:P) {
@@ -88,9 +98,12 @@ dc_smc <- function(data, P, nt) {
     A <- Sys_resamp(W, P, U)
     x_sampler_re <- x_sampler[A,s_i]
     
+    ### Update the marginal likelihood
+    L_prod_log <- L_prod_log + L_prod_log
+    
+    
+    
     ### Proposals
-    x_sampler[,s_i+1] <- x_sampler_re + rnorm(P, 0, 1)
+    x_sampler_star <- x_sampler_re + rnorm(P, 0, 1)
   }
-  
-  return(x_sampler[,nt])
 }
