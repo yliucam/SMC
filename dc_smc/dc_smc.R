@@ -22,18 +22,19 @@ dc_smc <- function(data, P, nt) {
   w_log_0 <- 0
   
   for (c_i in 1:n_n) {
-    x_ci <- x[,n_n]
+    x_ci <- x[,c_i]
     x_ci[1] <- x_0[c_i] + rnorm(1, 0, 1)
     w_log[1,c_i] <- w_log_0 + sum(sapply(data[,c_i], function(y) dnorm(y, x_ci[1], 1, log = T)))
     for (j in 2:P) {
       x_ci[j] <- x_ci[j-1] + rnorm(1, 0, 1)
-      w_log[j,c_i] <- w_log[j-1,c_i] + sum(apply(data[,c_i], 1, function(y) dnorm(y, x_ci[j], 1, log = T)))
+      w_log[j,c_i] <- w_log[j-1,c_i] + sum(sapply(data[,c_i], function(y) dnorm(y, x_ci[j], 1, log = T)))
+      if (w_log[j,c_i] < log(.Machine$double.xmin)) w_log[j,c_i] <- log(.Machine$double.xmin)
     }
-    W <- exp(w_log[j,c_i]) / sum(exp(w_log[j,c_i]))
+    W <- exp(w_log[,c_i]) / sum(exp(w_log[,c_i]))
     ### Independently resampling N particles -- 1(b)
     U <- runif(1, 0, 1)
     A <- Sys_resamp(W, P, U)
-    x[,n_n,i] <- x_ci[A]
+    x[,c_i] <- x_ci[A]
     ### Resampling mP particles -- 1(b) in Algorithm B2
     #for (jj in 1:m) {
     #  U <- runif(1, 0, 1)
@@ -46,7 +47,7 @@ dc_smc <- function(data, P, nt) {
   
   # Propose x_t from q_t(|x_c1, x_c2,...). Not consider \tilde{X}_t is empty for now
   ## How? Use a conjugate distribution with mean of (x_c1, x_c2,...)?
-  x_t_tilde <- rowMeans(x) + rnorm(3, 0, 1) ## Using a Normal random walk centered on the mean of x_c1, x_c2,...
+  x_t_tilde <- rowMeans(x) + rnorm(P, 0, 1) ## Using a Normal random walk centered on the mean of x_c1, x_c2,...
   
   # Sampler steps
   
@@ -63,8 +64,9 @@ dc_smc <- function(data, P, nt) {
     if (s_i == 1) {
       for (j in 1:P) {
         w_sampler_log[j,s_i] <- w_sampler_log_0 + sum(sapply(x[j,], function(y) dnorm(y, x_sampler_0[j], 1, log = T)))
+        if (w_sampler_log[j,s_i] < log(.Machine$double.xmin)) w_sampler_log[j,s_i] <- log(.Machine$double.xmin)
       }
-      W <- exp(w_sampler_log[j,s_i]) / sum(exp(w_sampler_log[j,s_i]))
+      W <- exp(w_sampler_log[,s_i]) / sum(exp(w_sampler_log[,s_i]))
       
       ### Resampling
       U <- runif(1, 0, 1)
@@ -77,8 +79,9 @@ dc_smc <- function(data, P, nt) {
     
     for (j in 1:P) {
       w_sampler_log[j,s_i+1] <- w_sampler_log[j,s_i] + sum(sapply(x[j,], function(y) dnorm(y, x_sampler[j,s_i], 1, log = T)))
+      if (w_sampler_log[j,s_i+1] < log(.Machine$double.xmin)) w_sampler_log[j,s_i+1] <- log(.Machine$double.xmin)
     }
-    W <- exp(w_sampler_log[j,s_i+1]) / sum(exp(w_sampler_log[j,s_i+1]))
+    W <- exp(w_sampler_log[,s_i+1]) / sum(exp(w_sampler_log[,s_i+1]))
     
     ### Resampling
     U <- runif(1, 0, 1)
@@ -88,4 +91,6 @@ dc_smc <- function(data, P, nt) {
     ### Proposals
     x_sampler[,s_i+1] <- x_sampler_re + rnorm(P, 0, 1)
   }
+  
+  return(x_sampler[,nt])
 }
