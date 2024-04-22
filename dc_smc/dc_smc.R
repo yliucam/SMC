@@ -1,4 +1,4 @@
-dc_smc <- function(data, P, nt) {
+dc_smc <- function(data, P, nt=nrow(data)) {
   # Try the original Algorithm 2 first
   
   #ESS_min <- P / 2 ## Initially, do not use this adaptive implementation
@@ -8,43 +8,53 @@ dc_smc <- function(data, P, nt) {
   n_n <- dim(data)[2]  ## The nodes have the same number of observations
   
   # Storage
-  #x_1 <- x_2 <- array(rep(NA, Ntotal*P), dim = c(P, Ntotal))
-  #x <- list(x1, x2)
+  x_c <- array(rep(NA, P*nt), dim = c(P, nt))
+  x_c_nt <- matrix(rep(NA, P*n_n), ncol = n_n)
   x <- array(rep(NA, P*n_n), dim = c(P, n_n))
   #x_1_mP <- x_2_mP <- rep(NA, m*P)
   #x_mP <- cbind(x_1_mP, x_2_mP)
   
-  w_log <- array(rep(NA, P*n_n), dim = c(P, n_n))
-  w_t_log <- rep(0, P)
+  w_log <- array(rep(NA, P*nt), dim = c(P, nt))
+  w_t_log <- array(rep(NA, P*nt), dim = c(P, nt))
   
   # Initialization
-  x_0 <- rep(0, n_n)
+  x_c_0 <- rep(0, P)
   w_log_0 <- 0
   L_c_prod_log <- 0
   
+  # Child nodes
   for (c_i in 1:n_n) {
-    x_ci <- x[,c_i]
-    x_ci[1] <- x_0[c_i] + rnorm(1, 0, 1)
-    w_log[1,c_i] <- w_log_0 + sum(sapply(data[,c_i], function(y) dnorm(y, x_ci[1], 1, log = T)))
-    for (j in 2:P) {
-      x_ci[j] <- x_ci[j-1] + rnorm(1, 0, 1)
-      w_log[j,c_i] <- w_log[j-1,c_i] + sum(sapply(data[,c_i], function(y) dnorm(y, x_ci[j], 1, log = T)))
-      if (w_log[j,c_i] < log(.Machine$double.xmin)) w_log[j,c_i] <- log(.Machine$double.xmin)
+    for (i in 1:(nt-1)) {
+      if (i == 1) {
+        x_c[,i] <- x_c_0 + rnorm(P, 0, 1000)
+        for (j in 1:P) {
+          w_log[j,i] <- w_log_0 + sum(sapply(data[,c_i], function(y) dnorm(y, x_c[j,i], 1, log = T)))
+          if (w_log[j,i] < log(.Machine$double.xmin)) w_log[j,i] <- log(.Machine$double.xmin)
+        }
+        W <- exp(w_log[,i]) / sum(exp(w_log[,i]))
+        
+        U <- runif(1, 0, 1)
+        A <- Sys_resamp(W=W, P=P, U=U)
+        x_c[,i] <- x_c[A,i]
+        
+        L_c_prod_log <- L_c_prod_log + log(sum(exp(w_log[,i]))) - log(P)
+      }
+      
+      x_c[,i+1] <- x_c[,i] + rnorm(P, 0, 1000)
+      for (j in 1:P) {
+        w_log[j,i+1] <- sum(sapply(data[,c_i], function(y) dnorm(y, x_c[j,i+1], 1, log = T)))
+        if (w_log[j,i+1] < log(.Machine$double.xmin)) w_log[j,i+1] <- log(.Machine$double.xmin)
+      }
+      W <- exp(w_log[,i+1]) / sum(exp(w_log[,i+1]))
+      
+      U <- runif(1, 0, 1)
+      A <- Sys_resamp(W=W, P=P, U=U)
+      x_c[,i+1] <- x_c[A,i+1]
+      
+      L_c_prod_log <- L_c_prod_log + log(sum(exp(w_log[,i+1]))) - log(P)
     }
-    W <- exp(w_log[,c_i]) / sum(exp(w_log[,c_i]))
-    ### Independently resampling N particles -- 1(b)
-    U <- runif(1, 0, 1)
-    A <- Sys_resamp(W, P, U)
-    x[,c_i] <- x_ci[A]
-    ### Resampling mP particles -- 1(b) in Algorithm B2
-    #for (jj in 1:m) {
-    #  U <- runif(1, 0, 1)
-    #  A <- Sys_resamp(W, P, U)
-    #  x_mP[((jj-1)*P+1):(jj*P), c_i] <- x_ci[A,i]
-    #}
     
-    ## Update the marginal likelihood
-    L_c_prod_log <- L_c_prod_log + log(sum(exp(w_log[,c_i]))) - log(P)
+    x_c_nt[,c_i] <- x_c[,nt]
   }
   
   
@@ -53,27 +63,25 @@ dc_smc <- function(data, P, nt) {
   ## Choose q_t to be u_t, the prior for \tilde{x}_t
   ## Select u_t as a conjugate prior to p(x_c|\tilde{x}_t) ~ N(\tilde{x}_t, 1).
   ## Due to above, we choose u_t ~ N(0, 1). Then q_t ~ N((x_c1+x_c2+...)/(1+n_n), 1/(1+n_n)).
-  x_t_tilde <- rowSums(x)/(1+n_n) + sqrt(1/(1+n_n)) * rnorm(P, 0, 1)
+  x_t_tilde <- rowSums(x_c_nt)/(1+n_n) + sqrt(1/(1+n_n)) * rnorm(P, 0, 1)
   
-  # Sampler steps
   
-  ## Storage
-  x_sampler <- array(rep(NA, P*nt), dim = c(P, nt))
-  w_sampler_log <- array(rep(NA, P*nt), dim = c(P, nt))
+  # Root
   
   ## Initialization
-  x_sampler_0 <- x_t_tilde
-  w_sampler_log_0 <- 0
-  L_prod_log <- 0
+  x_0 <- x_t_tilde
+  w_t_log_0 <- 0
+  L_prod_log <- L_c_prod_log
   
   ## Sampler iterations
-  for (s_i in 1:(nt-1)) {
-    if (s_i == 1) {
+  for (i in 1:(nt-1)) {
+    if (i == 1) {
+      x[,i] <- x_0 + rnorm(P, 0, 1)
       for (j in 1:P) {
-        w_sampler_log[j,s_i] <- w_sampler_log_0 + sum(sapply(x[j,], function(y) dnorm(y, x_sampler_0[j], 1, log = T)))
-        if (w_sampler_log[j,s_i] < log(.Machine$double.xmin)) w_sampler_log[j,s_i] <- log(.Machine$double.xmin)
+        w_t_log[j,i] <- w_t_log_0 + sum(sapply(x_c_nt[j,], function(y) dnorm(y, x[j,i], 1, log = T))) ## Should it be x_c_nt[j,] or x_c_nt?
+        if (w_t_log[j,i] < log(.Machine$double.xmin)) w_t_log[j,i] <- log(.Machine$double.xmin)
       }
-      W <- exp(w_sampler_log[,s_i]) / sum(exp(w_sampler_log[,s_i]))
+      W <- exp(w_t_log[,i]) / sum(exp(w_t_log[,i]))
       
       ### Resampling
       U <- runif(1, 0, 1)
@@ -81,7 +89,7 @@ dc_smc <- function(data, P, nt) {
       x_sampler_0_re <- x_sampler_0[A]
       
       ### Proposals
-      x_sampler[,s_i] <- x_sampler_0 + rnorm(P, 0, 1)
+      x_sampler[,s_i] <- x_sampler_0 + rnorm(P, 0, 1000)
       
       ### Update the marginal likelihood
       L_prod_log <- L_prod_log + L_c_prod_log
@@ -101,9 +109,9 @@ dc_smc <- function(data, P, nt) {
     ### Update the marginal likelihood
     L_prod_log <- L_prod_log + L_prod_log
     
-    
-    
     ### Proposals
-    x_sampler_star <- x_sampler_re + rnorm(P, 0, 1)
+    x_sampler[,s_i+1] <- x_sampler_re + rnorm(P, 0, 1000)
   }
+  
+  return(list(x_sampler=x_sampler[,nt], x_c=x))
 }
