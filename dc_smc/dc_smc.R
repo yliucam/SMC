@@ -1,4 +1,4 @@
-dc_smc <- function(data, P, nt=nrow(data)) {
+dc_smc <- function(data, P, nt=nrow(data), m) {
   # Try the original Algorithm 2 first
   
   #ESS_min <- P / 2 ## Initially, do not use this adaptive implementation
@@ -10,9 +10,10 @@ dc_smc <- function(data, P, nt=nrow(data)) {
   # Storage
   x_c <- array(rep(NA, P*nt), dim = c(P, nt))
   x_c_nt <- matrix(rep(NA, P*n_n), ncol = n_n)
-  x <- array(rep(NA, P*n_n), dim = c(P, n_n))
+  x <- array(rep(NA, P*nt), dim = c(P, nt))
   #x_1_mP <- x_2_mP <- rep(NA, m*P)
   #x_mP <- cbind(x_1_mP, x_2_mP)
+  W_c_nt <- matrix(rep(NA, P*n_n), ncol = n_n)
   
   w_log <- array(rep(NA, P*nt), dim = c(P, nt))
   w_t_log <- array(rep(NA, P*nt), dim = c(P, nt))
@@ -47,14 +48,28 @@ dc_smc <- function(data, P, nt=nrow(data)) {
       }
       W <- exp(w_log[,i+1]) / sum(exp(w_log[,i+1]))
       
-      U <- runif(1, 0, 1)
-      A <- Sys_resamp(W=W, P=P, U=U)
-      x_c[,i+1] <- x_c[A,i+1]
+      ### The last iteration is not resampled --- for the following mP times resampling
+      if (i != (nt-1)) { 
+        U <- runif(1, 0, 1)
+        A <- Sys_resamp(W=W, P=P, U=U)
+        x_c[,i+1] <- x_c[A,i+1]
+      }
       
       L_c_prod_log <- L_c_prod_log + log(sum(exp(w_log[,i+1]))) - log(P)
     }
     
     x_c_nt[,c_i] <- x_c[,nt]
+    W_c_nt[,c_i] <- W
+  }
+  
+  
+  # mP matchings storage
+  x_c_mP <- matrix(rep(NA, m*P*n_n), ncol = n_n)
+  ## Resampling
+  for (c_i in 1:n_n) {
+    U <- runif(1, 0, 1)
+    A <- Sys_resamp(W=W_c_nt[,c_i], P=m*P, U=U)
+    x_c_mP[,c_i] <- x_c_nt[A,c_i]
   }
   
   
