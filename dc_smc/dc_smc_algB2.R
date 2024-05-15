@@ -119,16 +119,20 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
   
   # Resampling P tuples with weights V_t
   v_t_log <- rep(NA, m*P)
+  p_check_log <- rep(NA, m*P) # Store pi_check
   for (j in 1:(m*P)) {
-    v_t_log[j] <- sum(sapply(x_c_mP[j,], function(y) dnorm(y, sum(x_c_mP[j,])/(1+n_n), 1, log = T)))
-                      - sum(pc_log_mP[j,])
+    pc_sum_log <- sum(pc_log_mP[j,])
+    p_int_log <- sum(sapply(x_c_mP[j,], function(y) dnorm(y, sum(x_c_mP[j,])/(1+n_n), 1, log = T)))
+    v_t_log[j] <- p_int - pc_sum
     v_t_log[j] <- v_t_log[j]*alpha
     if (v_t_log[j] < log(.Machine$double.xmin)) v_t_log[j] <- log(.Machine$double.xmin)
+    p_check_log[j] <- pc_sum^(1-alpha)*p_int^alpha
   }
   V_t <- exp(v_t_log)/sum(exp(v_t_log))
   U <- runif(1, 0, 1)
   A <- Sys_resamp(W=V_t, P=P, U=U)
   x_c_re <- x_c_mP[A,]
+  p_check_log_re <- p_check_log[A]
   
   L_prod_log <- L_c_prod_log + log(sum(exp(v_t_log))) - log(m*P)
   
@@ -136,46 +140,48 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
   
   # Root
   
-  x_t_tilde <- rowSums(x_c_re)/(1+n_n) + sqrt(1/(1+n_n)) * rnorm(P, 0, 1)
+  ## alpha increment for the annealing implementation
+  alpha_inc <- (1-alpha)/nt
   
   ## Initialization
-  x_0 <- x_t_tilde
+  x_c_sum <- rowSums(x_c_re)
+  x_0 <- x_c_sum/(1+n_n) + sqrt(1/(1+n_n)) * rnorm(P, 0, 1)
   w_t_log_0 <- 0
-  L_prod_log <- L_c_prod_log
   
   ## Sampler iterations
   for (i in 1:(nt-1)) {
     if (i == 1) {
-      ### Resampling
-      U <- runif(1, 0, 1)
-      A <- Sys_resamp(W=rep(1/P,P), P=P, U=U)
-      x_0 <- x_0[A]
-      
-      ### Proposals
-      x[,i] <- x_0 + rnorm(P, 0, 10)
       
       ### Update weights
       for (j in 1:P) {
-        w_t_log[j,i] <- w_t_log_0 + sum(sapply(x_c_re[j,], function(y) dnorm(y, x[j,i], 1, log = T))) ## Should it be x_c_nt[j,] or x_c_nt?
+        gamma_update <- sum(sapply(x_c_re[j,], function(y) dnorm(y, x_0[j], 1, log = T)))
+                            - p_check_log_re[j] - dnorm(x_0[j], x_c_sum[j], sqrt(1/(1+n_n)), log = T)
+        gamma_update <- gamma_update*alpha_inc
+        w_t_log[j,i] <- w_t_log_0 + gamma_update
+        #w_t_log[j,i] <- w_t_log_0 + sum(sapply(x_c_re[j,], function(y) dnorm(y, x[j,i], 1, log = T))) ## Should it be x_c_nt[j,] or x_c_nt?
         if (w_t_log[j,i] < log(.Machine$double.xmin)) w_t_log[j,i] <- log(.Machine$double.xmin)
       }
       W <- exp(w_t_log[,i]) / sum(exp(w_t_log[,i]))
       
       ### Update the marginal likelihood
       L_prod_log <- L_prod_log + log(sum(exp(w_t_log[,i]))) - log(P)
+      
+      ### Resampling
+      U <- runif(1, 0, 1)
+      A <- Sys_resamp(W=W, P=P, U=U)
+      x_0 <- x_0[A]
+      
+      ### Proposal
+      x[,i] <- x_0 + rnorm(P, 0, 10)
     }
-    
-    ### Resampling
-    U <- runif(1, 0, 1)
-    A <- Sys_resamp(W=W, P=P, U=U)
-    x[,i] <- x[A,i]
-    
-    ### Proposals
-    x[,i+1] <- x[,i] + rnorm(P, 0, 10)
     
     ### Update weights
     for (j in 1:P) {
-      w_t_log[j,i+1] <- sum(sapply(x_c_re[j,], function(y) dnorm(y, x[j,i+1], 1, log = T))) ## Same question as above
+      gamma_update <- sum(sapply(x_c_re[j,], function(y) dnorm(y, x[j,i], 1, log = T)))
+                          - p_check_log_re[j] - dnorm(x[j,i], x_c_sum[j], sqrt(1/(1+n_n)), log = T)
+      gamma_update <- gamma_update*alpha_inc
+      w_t_log[j,i+1] <- gamma_update
+      #w_t_log[j,i+1] <- sum(sapply(x_c_re[j,], function(y) dnorm(y, x[j,i+1], 1, log = T))) ## Same question as above
       if (w_t_log[j,i+1] < log(.Machine$double.xmin)) w_t_log[j,i+1] <- log(.Machine$double.xmin)
     }
     W <- exp(w_t_log[,i+1]) / sum(exp(w_t_log[,i+1]))
@@ -183,16 +189,16 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
     ### Update the marginal likelihood
     L_prod_log <- L_prod_log + log(sum(exp(w_t_log[,i+1]))) - log(P)
     
+    ### Proposal
+    x[,i+1] <- x[,i] + rnorm(P, 0, 10)
+    
   }
   
-  ### Is resampling needed for the final output of x?
-  #U <- runif(1, 0, 1)
-  #A <- Sys_resamp(W=W, P=P, U=U)
-  #x[,nt] <- x[A,nt]
+  x_t <- x[,nt]
   
-  return(list(x=x[,nt], x_c_nt=x_c_nt, x_t_tilde=x_t_tilde, W=W))
+  
+  return(list(x_t=x_t, x_c_nt=x_c_nt, x_t_tilde=x_t_tilde, W=W))
 }
-
 
 
 
