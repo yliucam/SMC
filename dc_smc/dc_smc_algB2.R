@@ -67,7 +67,7 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
   for (c_i in 1:n_n) {
     for (i in 1:(nt-1)) {
       if (i == 1) {
-        x_c[,i] <- x_c_0 + rnorm(P, 0, 10)
+        x_c[,i] <- x_c_0 + rnorm(P, 0, 1e6)
         for (j in 1:P) {
           w_log[j,i] <- w_log_0 + sum(sapply(data[,c_i], function(y) dnorm(y, x_c[j,i], 1, log = T)))
           if (w_log[j,i] < log(.Machine$double.xmin)) w_log[j,i] <- log(.Machine$double.xmin)
@@ -81,7 +81,7 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
         L_c_prod_log <- L_c_prod_log + log(sum(exp(w_log[,i]))) - log(P)
       }
       
-      x_c[,i+1] <- x_c[,i] + rnorm(P, 0, 10)
+      x_c[,i+1] <- x_c[,i] + rnorm(P, 0, 1e6)
       for (j in 1:P) {
         w_log[j,i+1] <- sum(sapply(data[,c_i], function(y) dnorm(y, x_c[j,i+1], 1, log = T)))
         if (w_log[j,i+1] < log(.Machine$double.xmin)) w_log[j,i+1] <- log(.Machine$double.xmin)
@@ -123,11 +123,12 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
   for (j in 1:(m*P)) {
     pc_sum_log <- sum(pc_log_mP[j,])
     p_int_log <- sum(sapply(x_c_mP[j,], function(y) dnorm(y, sum(x_c_mP[j,])/(1+n_n), 1, log = T)))
-    v_t_log[j] <- p_int - pc_sum
+    v_t_log[j] <- p_int_log - pc_sum_log
     v_t_log[j] <- v_t_log[j]*alpha
     if (v_t_log[j] < log(.Machine$double.xmin)) v_t_log[j] <- log(.Machine$double.xmin)
-    p_check_log[j] <- pc_sum^(1-alpha)*p_int^alpha
+    p_check_log[j] <- (1-alpha)*pc_sum_log + alpha*p_int_log
   }
+  if (sum(exp(v_t_log)) == Inf) v_t_log <- v_t_log - max(v_t_log)
   V_t <- exp(v_t_log)/sum(exp(v_t_log))
   U <- runif(1, 0, 1)
   A <- Sys_resamp(W=V_t, P=P, U=U)
@@ -141,7 +142,7 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
   # Root
   
   ## alpha increment for the annealing implementation
-  alpha_inc <- (1-alpha)/nt
+  alpha_inc <- 1/nt
   
   ## Initialization
   x_c_sum <- rowSums(x_c_re)
@@ -155,7 +156,7 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
       ### Update weights
       for (j in 1:P) {
         gamma_update <- sum(sapply(x_c_re[j,], function(y) dnorm(y, x_0[j], 1, log = T)))
-                            - p_check_log_re[j] - dnorm(x_0[j], x_c_sum[j], sqrt(1/(1+n_n)), log = T)
+        - p_check_log_re[j] - dnorm(x_0[j], x_c_sum[j], sqrt(1/(1+n_n)), log = T)
         gamma_update <- gamma_update*alpha_inc
         w_t_log[j,i] <- w_t_log_0 + gamma_update
         #w_t_log[j,i] <- w_t_log_0 + sum(sapply(x_c_re[j,], function(y) dnorm(y, x[j,i], 1, log = T))) ## Should it be x_c_nt[j,] or x_c_nt?
@@ -172,13 +173,13 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
       x_0 <- x_0[A]
       
       ### Proposal
-      x[,i] <- x_0 + rnorm(P, 0, 10)
+      x[,i] <- x_0 + rnorm(P, 0, 1e6)
     }
     
     ### Update weights
     for (j in 1:P) {
       gamma_update <- sum(sapply(x_c_re[j,], function(y) dnorm(y, x[j,i], 1, log = T)))
-                          - p_check_log_re[j] - dnorm(x[j,i], x_c_sum[j], sqrt(1/(1+n_n)), log = T)
+      - p_check_log_re[j] - dnorm(x[j,i], x_c_sum[j], sqrt(1/(1+n_n)), log = T)
       gamma_update <- gamma_update*alpha_inc
       w_t_log[j,i+1] <- gamma_update
       #w_t_log[j,i+1] <- sum(sapply(x_c_re[j,], function(y) dnorm(y, x[j,i+1], 1, log = T))) ## Same question as above
@@ -186,20 +187,26 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
     }
     W <- exp(w_t_log[,i+1]) / sum(exp(w_t_log[,i+1]))
     
+    
     ### Update the marginal likelihood
     L_prod_log <- L_prod_log + log(sum(exp(w_t_log[,i+1]))) - log(P)
     
+    ### Resampling
+    U <- runif(1, 0, 1)
+    A <- Sys_resamp(W=W, P=P, U=U)
+    x[,i] <- x[A,i]
+    
     ### Proposal
-    x[,i+1] <- x[,i] + rnorm(P, 0, 10)
+    x[,i+1] <- x[,i] + rnorm(P, 0, 1e6)
     
   }
   
   x_t <- x[,nt]
+  x_t_n <- x[,nt-1]
   
   
-  return(list(x_t=x_t, x_c_nt=x_c_nt, x_t_tilde=x_t_tilde, W=W))
+  return(list(x_t=x_t, x_t_n=x_t_n, x_c_nt=x_c_nt, x_t_tilde=x_0, W=W))
 }
-
 
 
 
