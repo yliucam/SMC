@@ -38,7 +38,7 @@ Sys_resamp <- function(W, P, U) {
 
 
 dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
-  #ESS_min <- P / 2 ## Initially, do not use this adaptive implementation
+  ESS_min <- P / 2 ## Initially, do not use this adaptive implementation
   
   ## Try a toy example with TWO child nodes
   TT_c <- dim(data)[1] ## Assume the data are stored in TWO columns in the example
@@ -67,21 +67,24 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
   for (c_i in 1:n_n) {
     for (i in 1:(nt-1)) {
       if (i == 1) {
-        x_c[,i] <- x_c_0 + rnorm(P, 0, 1e6)
+        x_c[,i] <- x_c_0 + rnorm(P, 0, 1e4)
         for (j in 1:P) {
           w_log[j,i] <- w_log_0 + sum(sapply(data[,c_i], function(y) dnorm(y, x_c[j,i], 1, log = T)))
           if (w_log[j,i] < log(.Machine$double.xmin)) w_log[j,i] <- log(.Machine$double.xmin)
         }
         W <- exp(w_log[,i]) / sum(exp(w_log[,i]))
         
-        U <- runif(1, 0, 1)
-        A <- Sys_resamp(W=W, P=P, U=U)
-        x_c[,i] <- x_c[A,i]
+        ESS <- 1/sum(W^2)
+        if (ESS < ESS_min) {
+          U <- runif(1, 0, 1)
+          A <- Sys_resamp(W=W, P=P, U=U)
+          x_c[,i] <- x_c[A,i]
+        }
         
         L_c_prod_log <- L_c_prod_log + log(sum(exp(w_log[,i]))) - log(P)
       }
       
-      x_c[,i+1] <- x_c[,i] + rnorm(P, 0, 1e6)
+      x_c[,i+1] <- x_c[,i] + rnorm(P, 0, 1e4)
       for (j in 1:P) {
         w_log[j,i+1] <- sum(sapply(data[,c_i], function(y) dnorm(y, x_c[j,i+1], 1, log = T)))
         if (w_log[j,i+1] < log(.Machine$double.xmin)) w_log[j,i+1] <- log(.Machine$double.xmin)
@@ -89,10 +92,13 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
       W <- exp(w_log[,i+1]) / sum(exp(w_log[,i+1]))
       
       ### The last iteration is not resampled --- for the following mP times resampling
-      if (i != (nt-1)) { 
-        U <- runif(1, 0, 1)
-        A <- Sys_resamp(W=W, P=P, U=U)
-        x_c[,i+1] <- x_c[A,i+1]
+      if (i != (nt-1)) {
+        ESS <- 1/sum(W^2)
+        if (ESS < ESS_min) {
+          U <- runif(1, 0, 1)
+          A <- Sys_resamp(W=W, P=P, U=U)
+          x_c[,i+1] <- x_c[A,i+1]
+        }
       }
       
       L_c_prod_log <- L_c_prod_log + log(sum(exp(w_log[,i+1]))) - log(P)
@@ -168,12 +174,16 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
       L_prod_log <- L_prod_log + log(sum(exp(w_t_log[,i]))) - log(P)
       
       ### Resampling
-      U <- runif(1, 0, 1)
-      A <- Sys_resamp(W=W, P=P, U=U)
-      x_0 <- x_0[A]
+      ESS <- 1/sum(W^2)
+      if (ESS < ESS_min) {
+        U <- runif(1, 0, 1)
+        A <- Sys_resamp(W=W, P=P, U=U)
+        x_0 <- x_0[A]  
+      }
+      
       
       ### Proposal
-      x[,i] <- x_0 + rnorm(P, 0, 1e6)
+      x[,i] <- x_0 + rnorm(P, 0, 1e4)
     }
     
     ### Update weights
@@ -192,12 +202,16 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
     L_prod_log <- L_prod_log + log(sum(exp(w_t_log[,i+1]))) - log(P)
     
     ### Resampling
-    U <- runif(1, 0, 1)
-    A <- Sys_resamp(W=W, P=P, U=U)
-    x[,i] <- x[A,i]
+    ESS <- 1/sum(W^2)
+    if (ESS < ESS_min) {
+      U <- runif(1, 0, 1)
+      A <- Sys_resamp(W=W, P=P, U=U)
+      x[,i] <- x[A,i]  
+    }
+    
     
     ### Proposal
-    x[,i+1] <- x[,i] + rnorm(P, 0, 1e6)
+    x[,i+1] <- x[,i] + rnorm(P, 0, 1e4)
     
   }
   
@@ -207,8 +221,4 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
   
   return(list(x_t=x_t, x_t_n=x_t_n, x_c_nt=x_c_nt, x_t_tilde=x_0, W=W))
 }
-
-
-
-
 
