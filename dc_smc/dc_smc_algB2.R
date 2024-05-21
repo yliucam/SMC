@@ -57,6 +57,9 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
   
   pc_log <- matrix(rep(NA, P*n_n), ncol = n_n) # Store the marginal likelihood for v_t
   
+  ESS_c <- matrix(rep(NA, nt*n_n), ncol = n_n)
+  ESS_t <- rep(NA, nt)
+  
   # Initialization
   x_c_0 <- rep(0, P)
   w_log_0 <- 0
@@ -72,13 +75,16 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
           w_log[j,i] <- w_log_0 + sum(sapply(data[,c_i], function(y) dnorm(y, x_c[j,i], 1, log = T)))
           if (w_log[j,i] < log(.Machine$double.xmin)) w_log[j,i] <- log(.Machine$double.xmin)
         }
+        if (max(w_log[,i]) == log(.Machine$double.xmin)) w_log[,i] <- 0
         W <- exp(w_log[,i]) / sum(exp(w_log[,i]))
         
         ESS <- 1/sum(W^2)
+        ESS_c[i,c_i] <- ESS
         if (ESS < ESS_min) {
           U <- runif(1, 0, 1)
           A <- Sys_resamp(W=W, P=P, U=U)
           x_c[,i] <- x_c[A,i]
+          w_log[,i] <- 0
         }
         
         L_c_prod_log <- L_c_prod_log + log(sum(exp(w_log[,i]))) - log(P)
@@ -86,18 +92,21 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
       
       x_c[,i+1] <- x_c[,i] + rnorm(P, 0, 1e4)
       for (j in 1:P) {
-        w_log[j,i+1] <- sum(sapply(data[,c_i], function(y) dnorm(y, x_c[j,i+1], 1, log = T)))
+        w_log[j,i+1] <- w_log[j,i] + sum(sapply(data[,c_i], function(y) dnorm(y, x_c[j,i+1], 1, log = T)))
         if (w_log[j,i+1] < log(.Machine$double.xmin)) w_log[j,i+1] <- log(.Machine$double.xmin)
       }
+      if (max(w_log[,i+1]) == log(.Machine$double.xmin)) w_log[,i+1] <- 0
       W <- exp(w_log[,i+1]) / sum(exp(w_log[,i+1]))
       
       ### The last iteration is not resampled --- for the following mP times resampling
       if (i != (nt-1)) {
         ESS <- 1/sum(W^2)
+        ESS_c[i+1,c_i] <- ESS
         if (ESS < ESS_min) {
           U <- runif(1, 0, 1)
           A <- Sys_resamp(W=W, P=P, U=U)
           x_c[,i+1] <- x_c[A,i+1]
+          w_log[,i+1] <- 0
         }
       }
       
@@ -168,6 +177,7 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
         #w_t_log[j,i] <- w_t_log_0 + sum(sapply(x_c_re[j,], function(y) dnorm(y, x[j,i], 1, log = T))) ## Should it be x_c_nt[j,] or x_c_nt?
         if (w_t_log[j,i] < log(.Machine$double.xmin)) w_t_log[j,i] <- log(.Machine$double.xmin)
       }
+      if (max(w_t_log[,i]) == log(.Machine$double.xmin)) w_t_log[,i] <- 0
       W <- exp(w_t_log[,i]) / sum(exp(w_t_log[,i]))
       
       ### Update the marginal likelihood
@@ -175,10 +185,12 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
       
       ### Resampling
       ESS <- 1/sum(W^2)
+      ESS_t[i] <- ESS
       if (ESS < ESS_min) {
         U <- runif(1, 0, 1)
         A <- Sys_resamp(W=W, P=P, U=U)
-        x_0 <- x_0[A]  
+        x_0 <- x_0[A]
+        w_t_log[,i] <- 0
       }
       
       
@@ -191,10 +203,11 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
       gamma_update <- sum(sapply(x_c_re[j,], function(y) dnorm(y, x[j,i], 1, log = T)))
       - p_check_log_re[j] - dnorm(x[j,i], x_c_sum[j], sqrt(1/(1+n_n)), log = T)
       gamma_update <- gamma_update*alpha_inc
-      w_t_log[j,i+1] <- gamma_update
+      w_t_log[j,i+1] <- w_t_log[j,i] + gamma_update
       #w_t_log[j,i+1] <- sum(sapply(x_c_re[j,], function(y) dnorm(y, x[j,i+1], 1, log = T))) ## Same question as above
       if (w_t_log[j,i+1] < log(.Machine$double.xmin)) w_t_log[j,i+1] <- log(.Machine$double.xmin)
     }
+    if (max(w_t_log[,i+1]) == log(.Machine$double.xmin)) w_t_log[,i+1] <- 0
     W <- exp(w_t_log[,i+1]) / sum(exp(w_t_log[,i+1]))
     
     
@@ -203,10 +216,12 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
     
     ### Resampling
     ESS <- 1/sum(W^2)
+    ESS_t[i+1] <- ESS
     if (ESS < ESS_min) {
       U <- runif(1, 0, 1)
       A <- Sys_resamp(W=W, P=P, U=U)
-      x[,i] <- x[A,i]  
+      x[,i] <- x[A,i]
+      w_t_log[,i+1] <- 0
     }
     
     
@@ -219,6 +234,13 @@ dc_smc_algB2 <- function(data, P, nt=nrow(data), m, alpha) {
   x_t_n <- x[,nt-1]
   
   
-  return(list(x_t=x_t, x_t_n=x_t_n, x_c_nt=x_c_nt, x_t_tilde=x_0, W=W))
+  return(list(x_t=x_t, 
+              x_t_n=x_t_n, 
+              x_c_nt=x_c_nt, 
+              x_t_tilde=x_0, 
+              W=W, 
+              w_t_log=w_t_log, 
+              ESS_c=ESS_c, 
+              ESS_t=ESS_t))
 }
 
