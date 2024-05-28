@@ -43,9 +43,9 @@ smc_sampler <- function(data, P, nt=length(data)) {
     
     for (i in 1:(nt-1)) {
       if (i == 1) {
-        x[,i] <- x_0 + rnorm(P, 0, 10000)
+        x[,i] <- x_0 + rnorm(P, 0, 10)
         for (j in 1:P) {
-          w_log[j,i] <- w_log_0[j] + sum(sapply(data, function(y) dnorm(y, x[j,i], 10, log = T)))
+          w_log[j,i] <- w_log_0[j] + sum(sapply(data[i], function(y) dnorm(y, x[j,i], 1, log = T)))
           if (w_log[j,i] < log(.Machine$double.xmin)) w_log[j,i] <- log(.Machine$double.xmin)
         }
         W[,i] <- exp(w_log[,i]) / sum(exp(w_log[,i]))
@@ -57,9 +57,9 @@ smc_sampler <- function(data, P, nt=length(data)) {
         L_log <- L_log + log(sum(exp(w_log[,i]))) - log(P)
       }
       
-      x[,i+1] <- x_re[,i] + rnorm(P, 0, 10000)
+      x[,i+1] <- x_re[,i] + rnorm(P, 0, 10)
       for (j in 1:P) {
-        w_log[j,i+1] <- sum(sapply(data, function(y) dnorm(y, x[j,i+1], 10, log = T)))
+        w_log[j,i+1] <- sum(sapply(data[i+1], function(y) dnorm(y, x[j,i+1], 1, log = T)))
         if (w_log[j,i+1] < log(.Machine$double.xmin)) w_log[j,i+1] <- log(.Machine$double.xmin)
       }
       W[,i+1] <- exp(w_log[,i+1]) / sum(exp(w_log[,i+1]))
@@ -75,9 +75,6 @@ smc_sampler <- function(data, P, nt=length(data)) {
     
     return(list(x=x_re[,nt], L_log=L_log))
 }
-
-
-
 
 
 
