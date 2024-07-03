@@ -72,3 +72,25 @@ arma::vec likelihood_particle_beta(arma::mat obs,
   
   return res;
 }
+
+
+
+//[[Rcpp::export]]
+arma::vec likelihood_particle_gamma(arma::mat obs,
+                                    arma::mat alpha,
+                                    arma::mat beta) {
+  const int N = obs.n_rows;
+  const int p = obs.n_cols;
+  
+  arma::vec res(N, arma::fill::zeros);
+  
+  for (int i=0; i<N; ++i) {
+    for (int j=0; j<p; ++j) {
+      res(i) = res(i) + R::dgamma(obs(i,j), alpha(i,j), beta(i,j), TRUE);
+    }
+  }
+  
+  return res;
+}
+
+
