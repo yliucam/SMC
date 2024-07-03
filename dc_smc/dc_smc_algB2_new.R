@@ -4,9 +4,11 @@ dc_smc_algB2_new <- function(data,
                          nt=nrow(data),
                          n_batch,
                          gamma_prior,
+                         LN_prior,
                          m,
                          alpha,
-                         Ntotal_sub) {
+                         Ntotal_sub,
+                         Ntotal_root) {
   
   ESS_min <- P / 2
   min_lim <- log(.Machine$double.xmin)
@@ -27,6 +29,11 @@ dc_smc_algB2_new <- function(data,
   x_sub <- array(rep(NA, N*n_sub), dim = c(N, n_sub))
   w_sub_log <- array(rep(NA, N*n_sub*nt), dim = c(N, n_sub, nt))
   W_sub <- array(rep(NA, N*n_sub), dim = c(N, n_sub))
+  
+  ## Root storage
+  x_root <- rep(NA, N)
+  w_root_log <- array(rep(NA, N*nt), dim = c(N, nt))
+  W_root <- rep(NA, N)
   
   
   
@@ -53,7 +60,7 @@ dc_smc_algB2_new <- function(data,
   
   # The merging step - leaf to subroot
   
-  ## mN matchings storage for leaf
+  ## Store mN matchings for the leaf nodes
   x_leaf_mN <- array(rep(NA, m*N*n_leaf), dim = c(m*N, n_leaf))
   W_leaf_mN <- array(rep(NA, m*N*n_leaf), dim = c(m*N, n_leaf))
   
@@ -112,7 +119,7 @@ dc_smc_algB2_new <- function(data,
     for (i in 1:(nt-1)) {
       if (i == 1) {
         q_sub_log <- sapply(x_sub_0, function(x) dgamma(x, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i], log = T))
-        p_sub_0_log <- p_check_log_resamp[,sub_i] + q_sub
+        p_sub_0_log <- p_check_log_resamp[,sub_i] + q_sub_log
         p_sub_like_log <- likelihood_particle_beta(obs = x_leaf_resamp[,,sub_i],
                                                alpha = cbind(x_sub_0, x_sub_0),
                                                beta = matrix(rep(beta_shape2[((sub_i-1)*2+1):(i*2)], N), ncol=2, byrow=T))
@@ -158,7 +165,7 @@ dc_smc_algB2_new <- function(data,
       ### Update weights
       p_sub_current <- (1-alpha_update)*p_sub_0_log + alpha_update*p_sub_t_log
       w_sub_log[,sub_i,i+1] <- 0 + p_sub_current - p_sub_prev # After the resampling, the previous w_log is 0
-      w_sub_log[,sub_i,i+1] <- weight_check(w_log = w_sub[,sub_i,i+1], min_lim = min_lim)
+      w_sub_log[,sub_i,i+1] <- weight_check(w_log = w_sub_log[,sub_i,i+1], min_lim = min_lim)
       
       if (max(w_sub_log[,sub_i,i+1]) == min_lim) w_sub_log[,sub+i,i+1] <- 0
       W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i+1]) / sum(exp(w_sub_log[,sub_i,i+1]))
@@ -183,18 +190,130 @@ dc_smc_algB2_new <- function(data,
   }
   
   
+  # The merging step - subroot to root
+  
+  ## Store mN machings for the subroot nodes
+  x_sub_mN <- array(rep(NA, m*N*n_sub), dim = c(m*N, n_sub))
+  W_sub_mN <- array(rep(NA, m*N*n_sub), dim = c(m*N, n_sub))
+  
+  
+  ## Resample mN particles from each subroot node
+  for (sub_i in 1:n_sub) {
+    U <- runif(1, 0, 1)
+    A <- Sys_resamp(W=W_sub[,sub_i], P=m*N, U=U)
+    x_sub_mN[,sub_i] <- x_sub[A, sub_i]
+    W_sub_mN[,sub_i] <- W_sub[A, sub_i]
+  }
+  
+  ## Resample N matchings from the mN matchings above based on V_t
+  v_t_log <- rep(NA, m*N)
+  p_check_log <- rep(NA, m*N)
+  x_sub_resamp <- array(rep(NA, N*2), dim = c(N, 2)) # Store the N resampling matchings
+  p_check_log_resamp <- rep(NA, N) # Store the N corresponding log pi_check
+  
+  
+  mu <- exp(LN_prior$mu)
+  for (j in 1:(m*N)) {
+    pc_log <- sum(log(W_sub_mN[j,]))
+    pc_int_log <- dgamma(x_sub_mN[,1], mu, gamma_prior$beta[1], log = T) +
+      dgamma(x_sub_mN[,2], mu, gamma_prior$beta[2], log = T)
+    p_check_log[j] <- (1-alpha)*pc_log + alpha*pc_int_log
+    v_t_log[j] <- p_check_log[j] - pc_log
+    if (v_t_log[j] < log(min_lim)) v_t_log[j] <- log(min_lim)
+  }
+  if (sum(exp(v_t_log)) == Inf) v_t_log <- v_t_log - max(v_t_log)
+  V_t <- exp(v_t_log) / sum(exp(v_t_log))
+  
+  U <- runif(1, 0, 1)
+  A <- Sys_resamp(W=V_t, P=N, U=U)
+  x_sub_resamp <- x_sub_mN[A,]
+  p_check_log_resamp <- p_check_log[A]
+  
+  L_prod_log <- L_prod_log + log(sum(exp(v_t_log))) - log(m*N)
   
   
   
+  # Root
+  ## Initialization
+  x_root_0 <- rlnorm(N, LN_prior$mu, LN_prior$sigma)
+  w_log_0 <- rep(0, N)
   
+  
+  ## SMC sampler
+  alpha_update <- alpha_inc
+  for (i in 1:(nt-1)) {
+    if (i == 1) {
+      q_root_log <- sapply(x_root_0, function(x) dlnorm(x, LN_prior$mu, LN_prior$sigma, log = T))
+      p_root_0_log <- p_check_log_resamp + q_root_log
+      p_root_like_log <- likelihood_particle_gamma(obs=x_sub_resamp,
+                                                   alpha=cbind(x_root_0, x_root_0),
+                                                   beta=matrix(rep(gamma_prior$beta, N), ncol=2, byrow=T))
+      p_root_t_log <- q_root_log + p_root_like_log
+      
+      ### Update weights
+      p_root_current <- (1-alpha_update)*p_root_0_log + alpha_update*p_root_t_log # Store this for the next iteration
+      w_root_log[,i] <- w_log_0 + p_root_current - p_root_0_log
+      w_root_log[,i] <- weight_check(w_log = w_root_log[,i], min_lim = min_lim)
+      
+      if (max(w_root_log[,i]) == min_lim) w_root_log[,i] <- 0
+      W_root <- exp(w_root_log[,i]) / sum(exp(w_root_log[,i]))
+      
+      ### Resampling
+      U <- runif(1, 0, 1)
+      A <- Sys_resamp(W=W_root, P=N, U=U)
+      x_root_resamp <- x_root_0[A]
+      
+      ### Marginal likelihood update
+      L_prod_log <- L_prod_log + log(sum(exp(w_root_log[,i]))) - log(N)
+      
+      ### MCMC kernel
+      x_root <- root_mcmc(data = x_sub_resamp,
+                          x_0 = x_root_resamp,
+                          prior_mu = LN_prior$mu,
+                          prior_sigma = LN_prior$sigma,
+                          like_beta = gamma_prior$beta,
+                          Ntotal = Ntotal_root)
+    }
+    
+    alpha_update <- alpha_update + alpha_inc
+    p_root_prev <- p_root_current
+    
+    ## Note: p_root_0 keeps the same for all iterations!
+    ## The prior for new samples is needed -- note: q_root_log is not the item used here!
+    p_root_prior_log <- sapply(x_root, function(x) dlnorm(x, LN_prior$mu, LN_prior$sigma, log = T))
+    p_root_like_log <- likelihood_particle_gamma(obs = x_sub_resamp,
+                                                 alpha = cbind(x_root, x_root),
+                                                 beta = matrix(rep(gamma_prior$beta, N), ncol=2, byrow=T))
+    p_root_t_log <- p_root_prior_log + p_root_like_log
+    
+    ### Update weights
+    p_root_current <- (1-alpha_update)*p_root_0_log + alpha_update*p_root_t_log
+    w_root_log[,i+1] <- 0 + p_root_current - p_root_prev # The previous w_log is 0 after the resampling
+    w_root_log[,i+1] <- weight_check(w_log = w_root_log[,i+1], min_lim = min_lim)
+    
+    if (max(w_root_log[,i+1]) == min_lim) w_root_log[,i+1] <- 0
+    W_root <- exp(w_root_log[,i+1]) / sum(exp(w_root_log[,i+1]))
+    
+    ### Resampling
+    U <- runif(1, 0, 1)
+    A <- Sys_resamp(W=W_root, P=N, U=U)
+    x_root_resamp <- x_root[A]
+    
+    
+    ### Marginal likelihood update
+    L_prod_log <- L_prod_log + log(sum(exp(w_root_log[,i+1]))) - log(N)
+    
+    ### MCMC kernel
+    x_root <- root_mcmc(data = x_sub_resamp,
+                        x_0 = x_root_resamp,
+                        prior_mu = LN_prior$mu,
+                        prior_sigma = LN_prior$sigma,
+                        Ntotal = Ntotal_root)
+  }
+  
+  
+  return(list(x = x_root, 
+              M_likeli = exp(L_prod_log)))
   
   
 }
-
-
-
-
-
-
-
-
