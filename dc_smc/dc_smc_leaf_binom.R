@@ -41,6 +41,3 @@ dc_smc_leaf_binom <- function(data, alpha, beta, n_trial, N) {
 
 
 
-
-
-
