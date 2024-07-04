@@ -1,16 +1,42 @@
-dc_smc_algB2_new <- function(data,
-                         n_trial,
-                         N,
-                         nt=nrow(data),
-                         n_batch,
-                         gamma_prior,
-                         LN_prior,
-                         m,
-                         alpha,
-                         Ntotal_sub,
-                         Ntotal_root) {
+# Systematic resampling - Algorithm 9.6 in Chopin & Papaspiliopoulous (2020)
+
+Sys_resamp <- function(W, P, U) {
+  A <- rep(NA, P)
+  v <- P * cumsum(W)
+  s <- U
+  m <- 1
+  for (i in 1:P) {
+    while (v[m] < s) {
+      m <- m + 1
+      #s <- s + 1
+    }
+    A[i] <- m
+    s <- s + 1
+  }
   
-  ESS_min <- P / 2
+  return(A)
+}
+
+
+
+
+
+
+# Algorithm B2 for the log-normal hierarchical model toy example
+
+dc_smc_algB2_new <- function(data,
+                             n_trial,
+                             N,
+                             nt=nrow(data),
+                             #n_batch,
+                             gamma_prior,
+                             LN_prior,
+                             m,
+                             alpha,
+                             Ntotal_sub,
+                             Ntotal_root) {
+  
+  ESS_min <- N / 2
   min_lim <- log(.Machine$double.xmin)
   
   n_leaf <- dim(data)[2] # Total number of leaf nodes
@@ -23,7 +49,7 @@ dc_smc_algB2_new <- function(data,
   ## Leaf storage
   x_leaf <- array(rep(NA, N*n_leaf), dim = c(N, n_leaf))
   W_leaf <- array(rep(NA, N*n_leaf), dim = c(N, n_leaf))
-  L_leaf_log <- array(rep(NA, N*n_leaf), dim = c(N, n_leaf)) # Store the logarithmic marginal likelihood separately
+  L_leaf_log <- rep(NA, n_leaf) # Store the logarithmic marginal likelihood separately
   
   ## Subroot storage
   x_sub <- array(rep(NA, N*n_sub), dim = c(N, n_sub))
@@ -45,15 +71,15 @@ dc_smc_algB2_new <- function(data,
   # Leaf nodes
   for (leaf_i in 1:n_leaf) {
     out_leaf <- dc_smc_leaf_binom(data=data[,leaf_i],
-                                      alpha=.5,
-                                      beta=.5,
-                                      n_trial=n_trial[leaf_i],
-                                      N=N)
+                                  alpha=.5,
+                                  beta=.5,
+                                  n_trial=n_trial[leaf_i],
+                                  N=N)
     x_leaf[,leaf_i] <- out_leaf$p_bin_post
     W_leaf[,leaf_i] <- out_leaf$W
-    L_leaf_log[,leaf_i] <- out_leaf$L_log
+    L_leaf_log[leaf_i] <- out_leaf$L_log
     
-    L_leaf_prod_log <- L_leaf_prod_log + L_leaf_log[,leaf_i]
+    L_leaf_prod_log <- L_leaf_prod_log + L_leaf_log[leaf_i]
   }
   
   
@@ -63,6 +89,9 @@ dc_smc_algB2_new <- function(data,
   ## Store mN matchings for the leaf nodes
   x_leaf_mN <- array(rep(NA, m*N*n_leaf), dim = c(m*N, n_leaf))
   W_leaf_mN <- array(rep(NA, m*N*n_leaf), dim = c(m*N, n_leaf))
+  
+  # Initilization
+  L_prod_log <- L_leaf_prod_log
   
   
   ## Reampling mN particles from each leaf node
@@ -85,12 +114,12 @@ dc_smc_algB2_new <- function(data,
   for (sub_i in 1:n_sub) {
     mu <- gamma_prior$alpha[sub_i] / gamma_prior$beta[sub_i]
     for (j in 1:(m*N)) {
-      pc_log <- sum(log(W_leaf_mN[j,((sub_i-1)*2+1):(i*2)]))
+      pc_log <- sum(log(W_leaf_mN[j,((sub_i-1)*2+1):(sub_i*2)]))
       pc_int_log <- dbeta(x_leaf_mN[j,((sub_i-1)*2+1)], mu, beta_shape2[((sub_i-1)*2+1)], log=T) +
         dbeta(x_leaf_mN[j,(sub_i*2)], mu, beta_shape2[sub_i*2], log=T)
       p_check_log[j,sub_i] <- (1-alpha)*pc_log + alpha*pc_int_log
       v_t_log[j,sub_i] <- p_check_log[j,sub_i] - pc_log
-      if (v_t_log[j,sub_i] < log(.Machine$double.xmin)) v_t_log[j,sub_i] <- log(.Machine$double.xmin)
+      if (v_t_log[j,sub_i] < min_lim) v_t_log[j,sub_i] <- min_lim
     }
     if (sum(exp(v_t_log[,sub_i])) == Inf) v_t_log[,sub_i] <- v_t_log[,sub_i] - max(v_t_log[,sub_i])
     V_t <- exp(v_t_log[,sub_i])/sum(exp(v_t_log[,sub_i]))
@@ -100,7 +129,7 @@ dc_smc_algB2_new <- function(data,
     x_leaf_resamp[,,sub_i] <- x_leaf_mN[A,((sub_i-1)*2+1):(sub_i*2)]
     p_check_log_resamp[,sub_i] <- p_check_log[A,sub_i]
     
-    L_prod_log <- L_leaf_prod_log + log(sum(exp(v_t_log[,sub_i]))) - log(m*N)
+    L_prod_log <- L_prod_log + log(sum(exp(v_t_log[,sub_i]))) - log(m*N)
   }
   
   
@@ -121,8 +150,8 @@ dc_smc_algB2_new <- function(data,
         q_sub_log <- sapply(x_sub_0, function(x) dgamma(x, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i], log = T))
         p_sub_0_log <- p_check_log_resamp[,sub_i] + q_sub_log
         p_sub_like_log <- likelihood_particle_beta(obs = x_leaf_resamp[,,sub_i],
-                                               alpha = cbind(x_sub_0, x_sub_0),
-                                               beta = matrix(rep(beta_shape2[((sub_i-1)*2+1):(i*2)], N), ncol=2, byrow=T))
+                                                   alpha = cbind(x_sub_0, x_sub_0),
+                                                   beta = matrix(rep(beta_shape2[((sub_i-1)*2+1):(sub_i*2)], N), ncol=2, byrow=T))
         p_sub_t_log <- q_sub_log + p_sub_like_log # Note: at the first iteration, the prior is the same as q_sub in this example!
         
         ### Update weights
@@ -130,7 +159,7 @@ dc_smc_algB2_new <- function(data,
         w_sub_log[,sub_i,i] <- w_log_0 + p_sub_current - p_sub_0_log
         w_sub_log[,sub_i,i] <- weight_check(w_log = w_sub_log[,sub_i,i], min_lim = min_lim)
         
-        if (max(w_sub_log[,sub_i,i]) == min_lim) w_sub_log[,sub_i,i] <- 0
+        if (sum(exp(w_sub_log[,sub_i,i])) == Inf) w_sub_log[,sub_i,i] <- w_sub_log[,sub_i,i] - max(w_sub_log[,sub_i,i])
         W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i]) / sum(exp(w_sub_log[,sub_i,i]))
         
         ### Resampling
@@ -146,7 +175,7 @@ dc_smc_algB2_new <- function(data,
                                   x_0 = x_sub_resamp,
                                   prior_alpha = gamma_prior$alpha[sub_i],
                                   prior_beta = gamma_prior$beta[sub_i],
-                                  like_beta = beta_shape2[((sub_i-1)*2+1):(i*2)],
+                                  like_beta = beta_shape2[((sub_i-1)*2+1):(sub_i*2)],
                                   Ntotal = Ntotal_sub)
         
       }
@@ -158,8 +187,8 @@ dc_smc_algB2_new <- function(data,
       ## The prior for new samples is needed -- note: q_sub_log is not the item used here!
       p_sub_prior_log <- sapply(x_sub[,sub_i], function(x) dgamma(x, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i], log = T))
       p_sub_like_log <- likelihood_particle_beta(obs = x_leaf_resamp[,,sub_i],
-                                             alpha = cbind(x_sub[,sub_i], x_sub[,sub_i]),
-                                             beta = matrix(rep(beta_shape2[((sub_i-1)*2+1):(i*2)], N), ncol=2, byrow=T))
+                                                 alpha = cbind(x_sub[,sub_i], x_sub[,sub_i]),
+                                                 beta = matrix(rep(beta_shape2[((sub_i-1)*2+1):(sub_i*2)], N), ncol=2, byrow=T))
       p_sub_t_log <- p_sub_prior_log + p_sub_like_log
       
       ### Update weights
@@ -167,7 +196,7 @@ dc_smc_algB2_new <- function(data,
       w_sub_log[,sub_i,i+1] <- 0 + p_sub_current - p_sub_prev # After the resampling, the previous w_log is 0
       w_sub_log[,sub_i,i+1] <- weight_check(w_log = w_sub_log[,sub_i,i+1], min_lim = min_lim)
       
-      if (max(w_sub_log[,sub_i,i+1]) == min_lim) w_sub_log[,sub+i,i+1] <- 0
+      if (sum(exp(w_sub_log[,sub_i,i+1])) == Inf) w_sub_log[,sub_i,i+1] <- w_sub_log[,sub_i,i+1] - max(w_sub_log[,sub_i,i+1])
       W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i+1]) / sum(exp(w_sub_log[,sub_i,i+1]))
       
       ### Resampling
@@ -183,7 +212,7 @@ dc_smc_algB2_new <- function(data,
                                 x_0 = x_sub_resamp,
                                 prior_alpha = gamma_prior$alpha[sub_i],
                                 prior_beta = gamma_prior$beta[sub_i],
-                                like_beta = beta_shape2[((sub_i-1)*2+1):(i*2)],
+                                like_beta = beta_shape2[((sub_i-1)*2+1):(sub_i*2)],
                                 Ntotal = Ntotal_sub)
       
     }
@@ -212,14 +241,14 @@ dc_smc_algB2_new <- function(data,
   p_check_log_resamp <- rep(NA, N) # Store the N corresponding log pi_check
   
   
-  mu <- exp(LN_prior$mu)
+  mu <- exp(LN_prior$mu + (LN_prior$sigma)^2/2)
   for (j in 1:(m*N)) {
     pc_log <- sum(log(W_sub_mN[j,]))
-    pc_int_log <- dgamma(x_sub_mN[,1], mu, gamma_prior$beta[1], log = T) +
-      dgamma(x_sub_mN[,2], mu, gamma_prior$beta[2], log = T)
+    pc_int_log <- dgamma(x_sub_mN[j,1], mu, gamma_prior$beta[1], log = T) +
+      dgamma(x_sub_mN[j,2], mu, gamma_prior$beta[2], log = T)
     p_check_log[j] <- (1-alpha)*pc_log + alpha*pc_int_log
     v_t_log[j] <- p_check_log[j] - pc_log
-    if (v_t_log[j] < log(min_lim)) v_t_log[j] <- log(min_lim)
+    if (v_t_log[j] < min_lim) v_t_log[j] <- min_lim
   }
   if (sum(exp(v_t_log)) == Inf) v_t_log <- v_t_log - max(v_t_log)
   V_t <- exp(v_t_log) / sum(exp(v_t_log))
@@ -255,7 +284,7 @@ dc_smc_algB2_new <- function(data,
       w_root_log[,i] <- w_log_0 + p_root_current - p_root_0_log
       w_root_log[,i] <- weight_check(w_log = w_root_log[,i], min_lim = min_lim)
       
-      if (max(w_root_log[,i]) == min_lim) w_root_log[,i] <- 0
+      if (sum(exp(w_root_log[,i])) == Inf) w_root_log[,i] <- w_root_log[,i] - max(w_root_log[,i])
       W_root <- exp(w_root_log[,i]) / sum(exp(w_root_log[,i]))
       
       ### Resampling
@@ -291,7 +320,7 @@ dc_smc_algB2_new <- function(data,
     w_root_log[,i+1] <- 0 + p_root_current - p_root_prev # The previous w_log is 0 after the resampling
     w_root_log[,i+1] <- weight_check(w_log = w_root_log[,i+1], min_lim = min_lim)
     
-    if (max(w_root_log[,i+1]) == min_lim) w_root_log[,i+1] <- 0
+    if (sum(exp(w_root_log[,i+1])) == Inf) w_root_log[,i+1] <- w_root_log[,i+1] - max(w_root_log[,i+1])
     W_root <- exp(w_root_log[,i+1]) / sum(exp(w_root_log[,i+1]))
     
     ### Resampling
@@ -308,12 +337,16 @@ dc_smc_algB2_new <- function(data,
                         x_0 = x_root_resamp,
                         prior_mu = LN_prior$mu,
                         prior_sigma = LN_prior$sigma,
+                        like_beta = gamma_prior$beta,
                         Ntotal = Ntotal_root)
   }
   
   
-  return(list(x = x_root, 
-              M_likeli = exp(L_prod_log)))
+  return(list(x_leaf = x_leaf, x_leaf_resamp = x_leaf_resamp, x_sub = x_sub, x_root = x_root))
   
   
 }
+
+
+
+
