@@ -8,24 +8,24 @@ sub_mcmc <- function(data, x_0, prior_alpha, prior_beta, like_beta, Ntotal) {
   for (i in 1:(Ntotal-1)) {
     if (i == 1) {
       # Proposal - log-normal random walk
-      x_star <- mvrnorm(1, log(x_0), 100*diag(N)) 
+      x_star <- exp(mvrnorm(1, log(x_0), 100*diag(N))) 
       
       # Prior
       prior_log <- sapply(x_0, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
-      prior_star_log <- sappy(x_star, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
+      prior_star_log <- sapply(x_star, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
       
       # Likelihood
       data_and_x <- cbind(data, x_0)
-      like_log <- sapply(data_and_x, function(x) dbeta(x[1], x[3], like_beta[1], log = T) + dbeta(x[2], x[3], like_beta[2], log = T))
+      like_log <- apply(data_and_x, 1, function(x) dbeta(x[1], x[3], like_beta[1], log = T) + dbeta(x[2], x[3], like_beta[2], log = T))
       data_and_x_star <- cbind(data, x_star)
-      like_star_log <- sapply(data_and_x_star, function(x) dbeta(x[1], x[3], like_beta[1], log = T) + dbeta(x[2], x[3], like_beta[2], log = T))
+      like_star_log <- apply(data_and_x_star, 1, function(x) dbeta(x[1], x[3], like_beta[1], log = T) + dbeta(x[2], x[3], like_beta[2], log = T))
       
       # Posterior
       post_log <- prior_log + like_log
       post_star_log <- prior_star_log + like_star_log
       
       # Accept/reject - carry out in a matrix format
-      ratio <- post_star_log - post_log + log(x_star) - log(x) # Note: consider the Jacobian determinant
+      ratio <- post_star_log - post_log + log(x_star) - log(x_0) # Note: consider the Jacobian determinant
       alpha <- sapply(ratio, function(x) min(0, x))
       Unif_rand <- runif(N, 0, 1)
       index <- which(log(Unif_rand) < alpha)
@@ -36,7 +36,7 @@ sub_mcmc <- function(data, x_0, prior_alpha, prior_beta, like_beta, Ntotal) {
     
     
     # Proposal - log-normal random walk
-    x_star <- mvrnorm(1, log(x), 100*diag(N))
+    x_star <- exp(mvrnorm(1, log(x), 100*diag(N)))
     
     # Prior
     prior_log <- sapply(x, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
@@ -52,7 +52,7 @@ sub_mcmc <- function(data, x_0, prior_alpha, prior_beta, like_beta, Ntotal) {
     ratio <- post_star_log - post_log + log(x_star) - log(x) # Note: consider the Jacobian determinant
     alpha <- sapply(ratio, function(x) min(0, x))
     Unif_rand <- runif(N, 0, 1)
-    index <- which(log(Unif_ran) < alpha)
+    index <- which(log(Unif_rand) < alpha)
     
     x[index] <- x_star[index]
     # No need to do so: x[-index] <- x[-index] !
@@ -73,7 +73,8 @@ root_mcmc <- function(data, x_0, prior_mu, prior_sigma, like_beta, Ntotal) {
   for (i in 1:(Ntotal-1)) {
     if (i == 1) {
       # Proposal - log-normal random walk
-      x_star <- mvrnorm(1, log(x_0), 100*diag(N))
+      x_star <- exp(mvrnorm(1, log(x_0), 100*diag(N)))
+      
       
       # Prior
       prior_log <- sapply(x_0, function(x) dlnorm(x, prior_mu, prior_sigma, log = T))
@@ -90,8 +91,8 @@ root_mcmc <- function(data, x_0, prior_mu, prior_sigma, like_beta, Ntotal) {
       post_star_log <- prior_star_log + like_star_log
       
       # Accept/reject - carry out in a matrix form
-      ratio <- post_star_log - post_log + log(x_star) - log(x) # Note: consider the Jacobian determinant
-      alpha <- sapply(ration, function(x) min(0, x))
+      ratio <- post_star_log - post_log + log(x_star) - log(x_0) # Note: consider the Jacobian determinant
+      alpha <- sapply(ratio, function(x) min(0, x))
       Unif_rand <- runif(N, 0, 1)
       index <- which(log(Unif_rand) < alpha)
       
@@ -101,7 +102,7 @@ root_mcmc <- function(data, x_0, prior_mu, prior_sigma, like_beta, Ntotal) {
     
     
     # Proposal - log-normal random walk
-    x_star <- mvrnorm(1, log(x), 100*diag(N))
+    x_star <- exp(mvrnorm(1, log(x), 100*diag(N)))
     
     # Prior
     prior_log <- sapply(x, function(x) dlnorm(x, prior_mu, prior_sigma, log = T))
@@ -125,4 +126,3 @@ root_mcmc <- function(data, x_0, prior_mu, prior_sigma, like_beta, Ntotal) {
   
   return(x_post=x)
 }
-                    
