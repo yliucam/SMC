@@ -171,11 +171,13 @@ dc_smc_algB2_new <- function(data,
         L_prod_log <- L_prod_log + log(sum(exp(w_sub_log[,sub_i,i]))) - log(N)
         
         ### MCMC kernel
+        var_sub <- var(x_sub_resamp)
         x_sub[,sub_i] <- sub_mcmc(data = x_leaf_resamp[,,sub_i],
                                   x_0 = x_sub_resamp,
                                   prior_alpha = gamma_prior$alpha[sub_i],
                                   prior_beta = gamma_prior$beta[sub_i],
                                   like_beta = beta_shape2[((sub_i-1)*2+1):(sub_i*2)],
+                                  var_sub = var_sub,
                                   Ntotal = Ntotal_sub)
         
       }
@@ -208,11 +210,13 @@ dc_smc_algB2_new <- function(data,
       L_prod_log <- L_prod_log + log(sum(exp(w_sub_log[,sub_i,i+1]))) - log(N)
       
       ### MCMC kernel
+      var_sub <- var(x_sub_resamp)
       x_sub[,sub_i] <- sub_mcmc(data = x_leaf_resamp[,,sub_i],
                                 x_0 = x_sub_resamp,
                                 prior_alpha = gamma_prior$alpha[sub_i],
                                 prior_beta = gamma_prior$beta[sub_i],
                                 like_beta = beta_shape2[((sub_i-1)*2+1):(sub_i*2)],
+                                var_sub = var_sub,
                                 Ntotal = Ntotal_sub)
       
     }
@@ -296,11 +300,13 @@ dc_smc_algB2_new <- function(data,
       L_prod_log <- L_prod_log + log(sum(exp(w_root_log[,i]))) - log(N)
       
       ### MCMC kernel
+      var_root <- var(x_root_resamp)
       x_root <- root_mcmc(data = x_sub_resamp,
                           x_0 = x_root_resamp,
                           prior_mu = LN_prior$mu,
                           prior_sigma = LN_prior$sigma,
                           like_beta = gamma_prior$beta,
+                          var_root = var_root,
                           Ntotal = Ntotal_root)
     }
     
@@ -333,20 +339,18 @@ dc_smc_algB2_new <- function(data,
     L_prod_log <- L_prod_log + log(sum(exp(w_root_log[,i+1]))) - log(N)
     
     ### MCMC kernel
+    var_root <- var(x_root_resamp)
     x_root <- root_mcmc(data = x_sub_resamp,
                         x_0 = x_root_resamp,
                         prior_mu = LN_prior$mu,
                         prior_sigma = LN_prior$sigma,
                         like_beta = gamma_prior$beta,
+                        var_root = var_root,
                         Ntotal = Ntotal_root)
   }
   
   
-  return(list(x_leaf = x_leaf, x_leaf_resamp = x_leaf_resamp, x_sub = x_sub, x_root = x_root))
+  return(list(x_leaf = x_leaf, x_sub = x_sub, x_sub_resamp = x_sub_resamp, x_root = x_root, x_root_resamp = x_root_resamp, W_root = W_root))
   
   
 }
-
-
-
-
