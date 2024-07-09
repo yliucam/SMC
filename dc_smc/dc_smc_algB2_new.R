@@ -27,7 +27,7 @@ Sys_resamp <- function(W, P, U) {
 dc_smc_algB2_new <- function(data,
                              n_trial,
                              N,
-                             nt=nrow(data),
+                             #nt=nrow(data),
                              #n_batch,
                              gamma_prior,
                              LN_prior,
@@ -43,7 +43,7 @@ dc_smc_algB2_new <- function(data,
   n <- dim(data)[1] # Number of observations
   n_sub <- n_leaf / 2 # Total number of subroot nodes
   
-  alpha_inc <- 1 / nt
+  nt <- 1 / alpha
   
   # Storage
   ## Leaf storage
@@ -144,7 +144,7 @@ dc_smc_algB2_new <- function(data,
     
     
     ## SMC sampler
-    alpha_update <- alpha_inc
+    alpha_update <- alpha
     for (i in 1:(nt-1)) {
       if (i == 1) {
         q_sub_log <- sapply(x_sub_0, function(x) dgamma(x, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i], log = T))
@@ -182,7 +182,7 @@ dc_smc_algB2_new <- function(data,
         
       }
       
-      alpha_update <- alpha_update + alpha_inc
+      alpha_update <- alpha_update + alpha
       p_sub_prev <- p_sub_current
       
       ## Note: p_sub_0 keeps the same for all iterations!
@@ -273,7 +273,7 @@ dc_smc_algB2_new <- function(data,
   
   
   ## SMC sampler
-  alpha_update <- alpha_inc
+  alpha_update <- alpha
   for (i in 1:(nt-1)) {
     if (i == 1) {
       q_root_log <- sapply(x_root_0, function(x) dlnorm(x, LN_prior$mu, LN_prior$sigma, log = T))
@@ -310,7 +310,7 @@ dc_smc_algB2_new <- function(data,
                           Ntotal = Ntotal_root)
     }
     
-    alpha_update <- alpha_update + alpha_inc
+    alpha_update <- alpha_update + alpha
     p_root_prev <- p_root_current
     
     ## Note: p_root_0 keeps the same for all iterations!
@@ -354,3 +354,7 @@ dc_smc_algB2_new <- function(data,
   
   
 }
+
+
+
+
