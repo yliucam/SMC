@@ -151,8 +151,7 @@ dc_smc_algB2_new <- function(data,
         A <- Sys_resamp(W=rep(1/N, N), P=N, U=U)
         x_sub_resamp <- x_sub_0[A]
         
-        ### Marginal likelihood update
-        L_prod_log <- L_prod_log + log(sum(exp(w_sub_log[,sub_i,i]))) - log(N)
+        
         
         ### MCMC kernel
         var_sub <- var(x_sub_resamp)
@@ -240,6 +239,9 @@ dc_smc_algB2_new <- function(data,
       A <- Sys_resamp(W=W_sub[,sub_i], P=N, U=U)
       x_sub[,sub_i] <- x_sub[A,sub_i]
     }
+    
+    ### Marginal likelihood update
+    L_prod_log <- L_prod_log + log(sum(exp(w_sub_log[,sub_i,nt]))) - log(N)
   }
   
   
@@ -301,8 +303,6 @@ dc_smc_algB2_new <- function(data,
       A <- Sys_resamp(W=rep(1/N, N), P=N, U=U)
       x_root_resamp <- x_root_0[A]
       
-      ### Marginal likelihood update
-      L_prod_log <- L_prod_log + log(sum(exp(w_root_log[,i]))) - log(N)
       
       ### MCMC kernel
       var_root <- var(x_root_resamp)
@@ -388,6 +388,9 @@ dc_smc_algB2_new <- function(data,
     A <- Sys_resamp(W=W_root, P=N, U=U)
     x_root <- x_root[A]
   }
+  
+  ### Marginal likelihood update
+  L_prod_log <- L_prod_log + log(sum(exp(w_root_log[,nt]))) - log(N)
   
   
   
