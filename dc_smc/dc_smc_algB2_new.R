@@ -154,13 +154,13 @@ dc_smc_algB2_new <- function(data,
         
         
         ### MCMC kernel
-        var_sub <- var(x_sub_resamp)
+        #var_sub <- var(x_sub_resamp)
         x_sub[,sub_i] <- sub_mcmc(data = x_leaf_resamp[,,sub_i],
                                   x_0 = x_sub_resamp,
                                   prior_alpha = gamma_prior$alpha[sub_i],
                                   prior_beta = gamma_prior$beta[sub_i],
                                   like_beta = beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)],
-                                  var_sub = var_sub,
+                                  var_sub = 1,
                                   Ntotal = Ntotal_sub)
         
         
@@ -305,13 +305,13 @@ dc_smc_algB2_new <- function(data,
       
       
       ### MCMC kernel
-      var_root <- var(x_root_resamp)
+      #var_root <- var(x_root_resamp)
       x_root <- root_mcmc(data = x_sub_resamp,
                           x_0 = x_root_resamp,
                           prior_mu = LN_prior$mu,
                           prior_sigma = LN_prior$sigma,
                           like_beta = gamma_prior$beta,
-                          var_root = var_root,
+                          var_root = 1,
                           Ntotal = Ntotal_root)
       
       ### Update weights
