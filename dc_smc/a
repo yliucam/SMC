@@ -556,3 +556,5 @@ root_mcmc <- function(data, alpha_update, x_0, prior_mu, prior_sigma, like_beta,
   return(x_post=x)
 }
 
+
+
