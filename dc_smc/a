@@ -1,5 +1,7 @@
 # Algorithm B2 for the log-normal hierarchical model toy example
 
+#library(univariateML)
+
 dc_smc_algB2_new <- function(data,
                              N,
                              nodes_n,
@@ -114,7 +116,8 @@ dc_smc_algB2_new <- function(data,
   
   for (sub_i in 1:n_sub) {
     ## Initialization
-    x_sub_0 <- rgamma(N, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i])
+    gamma_alpha <- gamma_prior$beta[sub_i]*mean(colMeans(x_leaf_resamp[,,sub_i]))/(1-mean(colMeans(x_leaf_resamp[,,sub_i])))
+    x_sub_0 <- rgamma(N, gamma_alpha, gamma_prior$beta[sub_i])
     w_log_0 <- rep(0, N)
     
     
@@ -134,7 +137,7 @@ dc_smc_algB2_new <- function(data,
         x_sub[,sub_i] <- sub_mcmc(data = x_leaf_resamp[,,sub_i],
                                   alpha_update = alpha_update,
                                   x_0 = x_sub_resamp,
-                                  prior_alpha = gamma_prior$alpha[sub_i],
+                                  prior_alpha = gamma_alpha,
                                   prior_beta = gamma_prior$beta[sub_i],
                                   like_beta = beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)],
                                   var_sub = 1,
@@ -142,15 +145,17 @@ dc_smc_algB2_new <- function(data,
         
         
         ### Update weights
-        q_sub_log <- sapply(x_sub[,sub_i], function(x) dgamma(x, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i], log = T))
-        p_sub_0_log <- p_check_log_resamp[,sub_i] + q_sub_log
+        #q_sub_log <- sapply(x_sub[,sub_i], function(x) dgamma(x, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i], log = T))
+        #p_sub_0_log <- p_check_log_resamp[,sub_i] + q_sub_log
         p_sub_like_log <- likelihood_particle_beta(obs = x_leaf_resamp[,,sub_i],
                                                    alpha = matrix(rep(x_sub[,sub_i], n_leaf/n_sub), ncol = n_leaf/n_sub),
                                                    beta = matrix(rep(beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)], N), ncol=n_leaf/n_sub, byrow=T))
-        p_sub_t_log <- q_sub_log + p_sub_like_log # Note: at the first iteration, the prior is the same as q_sub in this example!
+        #p_sub_t_log <- q_sub_log + p_sub_like_log # Note: at the first iteration, the prior is the same as q_sub in this example!
         
-        p_sub_current <-  (1-alpha_update)*p_sub_0_log + alpha_update*p_sub_t_log # Better to store here for the use by the next iteration!
-        w_sub_log[,sub_i,i] <- w_log_0 + p_sub_current - p_sub_0_log
+        #p_sub_current <-  (1-alpha_update)*p_sub_0_log + alpha_update*p_sub_t_log # Better to store here for the use by the next iteration!
+        p_sub_current <- (1-alpha_update)*p_check_log_resamp[,sub_i] + alpha_update*p_sub_like_log
+        #w_sub_log[,sub_i,i] <- w_log_0 + p_sub_current - p_sub_0_log
+        w_sub_log[,sub_i,i] <- w_log_0 + p_sub_current - p_check_log_resamp[,sub_i]
         w_sub_log[,sub_i,i] <- weight_check(w_log = w_sub_log[,sub_i,i], min_lim = min_lim)
         
         if (sum(exp(w_sub_log[,sub_i,i])) == Inf) w_sub_log[,sub_i,i] <- w_sub_log[,sub_i,i] - max(w_sub_log[,sub_i,i])
@@ -162,25 +167,26 @@ dc_smc_algB2_new <- function(data,
       p_sub_prev <- p_sub_current
       
       ### Resampling -- optionally
-      ESS <- 1 / sum(W_sub[,sub_i]^2)
-      if (ESS < ESS_min) {
+      #ESS <- 1 / sum(W_sub[,sub_i]^2)
+      #if (ESS < ESS_min) {
         U <- runif(1, 0, 1)
         A <- Sys_resamp(W=W_sub[,sub_i], P=N, U=U)
         x_sub_resamp <- x_sub[A,sub_i]
-      } else {
-        x_sub_resamp <- x_sub[,sub_i]
-      }
+      #} else {
+      #  x_sub_resamp <- x_sub[,sub_i]
+      #}
       
       
       ### Marginal likelihood update
       L_prod_log <- L_prod_log + log(sum(exp(w_sub_log[,sub_i,i+1]))) - log(N)
       
       ### MCMC kernel
-      var_sub <- var(x_sub_resamp)
+      var_sub <- log(2.38*var(x_sub_resamp))
+      if (var_sub < 1) var_sub <- 1
       x_sub[,sub_i] <- sub_mcmc(data = x_leaf_resamp[,,sub_i],
                                 alpha_update = alpha_update,
                                 x_0 = x_sub_resamp,
-                                prior_alpha = gamma_prior$alpha[sub_i],
+                                prior_alpha = gamma_alpha,
                                 prior_beta = gamma_prior$beta[sub_i],
                                 like_beta = beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)],
                                 var_sub = var_sub,
@@ -190,18 +196,19 @@ dc_smc_algB2_new <- function(data,
       ### Update weights
       ## Note: p_sub_0 keeps the same for all iterations!
       ## The prior for new samples is needed -- note: q_sub_log is not the item used here!
-      p_sub_prior_log <- sapply(x_sub[,sub_i], function(x) dgamma(x, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i], log = T))
+      #p_sub_prior_log <- sapply(x_sub[,sub_i], function(x) dgamma(x, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i], log = T))
       p_sub_like_log <- likelihood_particle_beta(obs = x_leaf_resamp[,,sub_i],
                                                  alpha = matrix(rep(x_sub[,sub_i], n_leaf/n_sub), ncol = n_leaf/n_sub),
                                                  beta = matrix(rep(beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)], N), ncol=n_leaf/n_sub, byrow=T))
-      p_sub_t_log <- p_sub_prior_log + p_sub_like_log
+      #p_sub_t_log <- p_sub_prior_log + p_sub_like_log
       
-      p_sub_current <- (1-alpha_update)*p_sub_0_log + alpha_update*p_sub_t_log
-      if (ESS < ESS_min) {
+      #p_sub_current <- (1-alpha_update)*p_sub_0_log + alpha_update*p_sub_t_log
+      p_sub_current <- (1-alpha_update)*p_check_log_resamp[,sub_i] + alpha_update*p_sub_like_log
+      #if (ESS < ESS_min) {
         w_sub_log[,sub_i,i+1] <- 0 + p_sub_current - p_sub_prev # After the resampling, the previous w_log is 0
-      } else {
-        w_sub_log[,sub_i,i+1] <- w_sub_log[,sub_i,i] + p_sub_current - p_sub_prev
-      }
+      #} else {
+      #  w_sub_log[,sub_i,i+1] <- w_sub_log[,sub_i,i] + p_sub_current - p_sub_prev
+      #}
       
       w_sub_log[,sub_i,i+1] <- weight_check(w_log = w_sub_log[,sub_i,i+1], min_lim = min_lim)
       
@@ -211,12 +218,12 @@ dc_smc_algB2_new <- function(data,
     }
     
     ### Resampling for x_t_nt -- optionally
-    ESS <- 1 / sum(W_sub[,sub_i]^2)
-    if (ESS < ESS_min) {
+    #ESS <- 1 / sum(W_sub[,sub_i]^2)
+    #if (ESS < ESS_min) {
       U <- runif(1, 0, 1)
       A <- Sys_resamp(W=W_sub[,sub_i], P=N, U=U)
       x_sub[,sub_i] <- x_sub[A,sub_i]
-    }
+    #}
     
     ### Marginal likelihood update
     L_prod_log <- L_prod_log + log(sum(exp(w_sub_log[,sub_i,nt]))) - log(N)
@@ -329,7 +336,8 @@ dc_smc_algB2_new <- function(data,
     L_prod_log <- L_prod_log + log(sum(exp(w_root_log[,i+1]))) - log(N)
     
     ### MCMC kernel
-    var_root <- var(x_root_resamp)
+    var_root <- log(2.38*var(x_root_resamp))
+    if (var_root < 1) var_root <- 1
     x_root <- root_mcmc(data = x_sub_resamp,
                         alpha_update = alpha_update,
                         x_0 = x_root_resamp,
@@ -388,8 +396,6 @@ dc_smc_algB2_new <- function(data,
 
 
 
-
-
 # MCMC/MH kernel help function on the subroot node
 sub_mcmc <- function(data, alpha_update, x_0, prior_alpha, prior_beta, like_beta, var_sub, Ntotal) {
   N <- length(x_0)
@@ -401,7 +407,7 @@ sub_mcmc <- function(data, alpha_update, x_0, prior_alpha, prior_beta, like_beta
   for (i in 1:(Ntotal-1)) {
     if (i == 1) {
       # Proposal - log-normal random walk
-      x_star <- sapply(x_0, function(x) rlnorm(1, log(x), sdlog = sqrt(2.38*var_sub)))
+      x_star <- sapply(x_0, function(x) rlnorm(1, log(x), sdlog = sqrt(var_sub)))
       #x_star <- exp(mvrnorm(1, log(x_0), 2.38*diag(var_sub, N))) 
       
       # Prior
@@ -422,8 +428,8 @@ sub_mcmc <- function(data, alpha_update, x_0, prior_alpha, prior_beta, like_beta
       
       # Transition/proposal density
       x_and_x_star <- cbind(x_0, x_star)
-      prop_x_to_x_star <- apply(x_and_x_star, 1, function(x) dlnorm(x[2], log(x[1]), sdlog = 10, log = T))
-      prop_x_star_to_x <- apply(x_and_x_star, 1, function(x) dlnorm(x[1], log(x[2]), sdlog = 10, log = T))
+      prop_x_to_x_star <- apply(x_and_x_star, 1, function(x) dlnorm(x[2], log(x[1]), sdlog = sqrt(var_sub), log = T))
+      prop_x_star_to_x <- apply(x_and_x_star, 1, function(x) dlnorm(x[1], log(x[2]), sdlog = sqrt(var_sub), log = T))
       
       # Accept/reject - carry out in a matrix format
       ratio <- alpha_update*(post_star_log - post_log) + prop_x_star_to_x - prop_x_to_x_star
@@ -437,7 +443,7 @@ sub_mcmc <- function(data, alpha_update, x_0, prior_alpha, prior_beta, like_beta
     
     
     # Proposal - log-normal random walk
-    x_star <- sapply(x, function(x) rlnorm(1, log(x), sdlog = sqrt(2.38*var_sub)))
+    x_star <- sapply(x, function(x) rlnorm(1, log(x), sdlog = sqrt(var_sub)))
     #x_star <- exp(mvrnorm(1, log(x), 2.38*diag(var_sub, N)))
     
     # Prior
@@ -458,8 +464,8 @@ sub_mcmc <- function(data, alpha_update, x_0, prior_alpha, prior_beta, like_beta
     
     # Transition/proposal density
     x_and_x_star <- cbind(x, x_star)
-    prop_x_to_x_star <- apply(x_and_x_star, 1, function(x) dlnorm(x[2], log(x[1]), sdlog = sqrt(2.38*var_sub), log = T))
-    prop_x_star_to_x <- apply(x_and_x_star, 1, function(x) dlnorm(x[1], log(x[2]), sdlog = sqrt(2.38*var_sub), log = T))
+    prop_x_to_x_star <- apply(x_and_x_star, 1, function(x) dlnorm(x[2], log(x[1]), sdlog = sqrt(var_sub), log = T))
+    prop_x_star_to_x <- apply(x_and_x_star, 1, function(x) dlnorm(x[1], log(x[2]), sdlog = sqrt(var_sub), log = T))
     
     # Accept/reject - carry out in a matrix format
     ratio <- alpha_update*(post_star_log - post_log) + prop_x_star_to_x - prop_x_to_x_star
@@ -486,7 +492,7 @@ root_mcmc <- function(data, alpha_update, x_0, prior_mu, prior_sigma, like_beta,
   for (i in 1:(Ntotal-1)) {
     if (i == 1) {
       # Proposal - log-normal random walk
-      x_star <- sapply(x_0, function(x) rlnorm(1, log(x), sqrt(2.38*var_root)))
+      x_star <- sapply(x_0, function(x) rlnorm(1, log(x), sqrt(var_root)))
       #x_star <- exp(mvrnorm(1, log(x_0), 10*diag(N)))
       
       
@@ -506,8 +512,8 @@ root_mcmc <- function(data, alpha_update, x_0, prior_mu, prior_sigma, like_beta,
       
       # Transition/proposal density
       x_and_x_star <- cbind(x_0, x_star)
-      prop_x_to_x_star <- apply(x_and_x_star, 1, function(x) dlnorm(x[2], log(x[1]), sqrt(2.38*var_root), log = T))
-      prop_x_star_to_x <- apply(x_and_x_star, 1, function(x) dlnorm(x[1], log(x[2]), sqrt(2.38*var_root), log = T))
+      prop_x_to_x_star <- apply(x_and_x_star, 1, function(x) dlnorm(x[2], log(x[1]), sqrt(var_root), log = T))
+      prop_x_star_to_x <- apply(x_and_x_star, 1, function(x) dlnorm(x[1], log(x[2]), sqrt(var_root), log = T))
       
       # Accept/reject - carry out in a matrix form
       ratio <- alpha_update*(post_star_log - post_log) + prop_x_star_to_x - prop_x_to_x_star
@@ -521,7 +527,7 @@ root_mcmc <- function(data, alpha_update, x_0, prior_mu, prior_sigma, like_beta,
     
     
     # Proposal - log-normal random walk
-    x_star <- sapply(x, function(x) rlnorm(1, log(x), sqrt(2.38*var_root)))
+    x_star <- sapply(x, function(x) rlnorm(1, log(x), sqrt(var_root)))
     #x_star <- exp(mvrnorm(1, log(x), 10*diag(N)))
     
     # Prior
@@ -540,8 +546,8 @@ root_mcmc <- function(data, alpha_update, x_0, prior_mu, prior_sigma, like_beta,
     
     # Transition/proposal density
     x_and_x_star <- cbind(x, x_star)
-    prop_x_to_x_star <- apply(x_and_x_star, 1, function(x) dlnorm(x[2], log(x[1]), sqrt(2.38*var_root), log = T))
-    prop_x_star_to_x <- apply(x_and_x_star, 1, function(x) dlnorm(x[1], log(x[2]), sqrt(2.38*var_root), log = T))
+    prop_x_to_x_star <- apply(x_and_x_star, 1, function(x) dlnorm(x[2], log(x[1]), sqrt(var_root), log = T))
+    prop_x_star_to_x <- apply(x_and_x_star, 1, function(x) dlnorm(x[1], log(x[2]), sqrt(var_root), log = T))
     
     # Accept/reject - carry out in a matrix form
     ratio <- alpha_update*(post_star_log - post_log) + prop_x_star_to_x - prop_x_to_x_star
@@ -555,6 +561,3 @@ root_mcmc <- function(data, alpha_update, x_0, prior_mu, prior_sigma, like_beta,
   
   return(x_post=x)
 }
-
-
-
