@@ -66,6 +66,14 @@ dc_smc_algB2_new <- function(data,
   x_leaf_mN <- array(rep(NA, m*N*n_leaf), dim = c(m*N, n_leaf))
   W_leaf_mN <- array(rep(NA, m*N*n_leaf), dim = c(m*N, n_leaf))
   
+  ## Store the estimated alpha based on the mean of each subroot node and the beta distribution properties for all N 
+  ## Used for the noninformative prior at subroot 
+  x_leaf_alpha <- array(rep(NA, N*n_sub), dim = c(N, n_sub))
+  for (sub_i in 1:n_sub) {
+    x_leaf_mean <- rowMeans(x_leaf[,((sub_i-1)*(n_leaf/n_sub)+1):(sub_i*n_leaf/n_sub)])
+    x_leaf_alpha[,sub_i] <- x_leaf_mean * beta_prior$beta[sub_i*n_leaf/n_sub] / (1-x_leaf_mean) 
+  }
+  
   
   
   # Initilization
@@ -88,7 +96,7 @@ dc_smc_algB2_new <- function(data,
   p_check_log_resamp <- array(rep(NA, N*n_sub), dim = c(N, n_sub)) # Store the N corresponding log pi_check
   
   for (sub_i in 1:n_sub) {
-    mu <- 500/2
+    mu <- (min(x_leaf_alpha[,sub_i])+max(x_leaf_alpha[,sub_i]))/2
     for (j in 1:(m*N)) {
       pc_log <- sum(log(W_leaf_mN[j,((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)]))
       pc_int_log <- sum(sapply(x_leaf_mN[j,((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)], function(x) dbeta(x, mu, beta_prior$beta[sub_i*n_leaf/n_sub], log = T)))
@@ -113,10 +121,14 @@ dc_smc_algB2_new <- function(data,
   
   
   for (sub_i in 1:n_sub) {
+    x_leaf_max <- max(x_leaf_alpha[,sub_i])
+    x_leaf_min <- min(x_leaf_alpha[,sub_i])
     ## Initialization
-    x_sub_0 <- runif(N, 200, 300)
+    x_sub_0 <- runif(N, x_leaf_min, x_leaf_max)
     #x_sub_0 <- rgamma(N, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i])
     w_log_0 <- rep(0, N)
+    
+    
     
     
     ## SMC sampler
@@ -363,12 +375,12 @@ dc_smc_algB2_new <- function(data,
   }
   
   ### Resampling for the x_t_nt -- optionally
-  ESS <- 1 / sum(W_root^2)
-  if (ESS < ESS_min) {
-    U <- runif(1, 0, 1)
-    A <- Sys_resamp(W=W_root, P=N, U=U)
-    x_root <- x_root[A]
-  }
+  #ESS <- 1 / sum(W_root^2)
+  #if (ESS < ESS_min) {
+  #  U <- runif(1, 0, 1)
+  #  A <- Sys_resamp(W=W_root, P=N, U=U)
+  #  x_root <- x_root[A]
+  #}
   
   ### Marginal likelihood update
   L_prod_log <- L_prod_log + log(sum(exp(w_root_log[,nt]))) - log(N)
@@ -407,7 +419,7 @@ sub_mcmc <- function(data, alpha_update, x_0, prior_alpha, prior_beta, like_beta
       # Prior
       #prior_log <- sapply(x_0, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
       #prior_star_log <- sapply(x_star, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
-      prior_log <- prior_star_log <- log(1/140)
+      #prior_log <- prior_star_log <- log(1/140)
       
       # Likelihood
       like_log <- likelihood_particle_beta(data, matrix(rep(x_0, d), ncol = d), matrix(rep(like_beta, N), ncol = d, byrow = T))
@@ -418,8 +430,10 @@ sub_mcmc <- function(data, alpha_update, x_0, prior_alpha, prior_beta, like_beta
       #like_star_log <- apply(data_and_x_star, 1, function(x) dbeta(x[1], x[3], like_beta[1], log = T) + dbeta(x[2], x[3], like_beta[2], log = T))
       
       # Posterior
-      post_log <- prior_log + like_log
-      post_star_log <- prior_star_log + like_star_log
+      #post_log <- prior_log + like_log
+      #post_star_log <- prior_star_log + like_star_log
+      post_log <- like_log
+      post_star_log <- like_star_log
       
       # Transition/proposal density
       x_and_x_star <- cbind(x_0, x_star)
@@ -444,7 +458,7 @@ sub_mcmc <- function(data, alpha_update, x_0, prior_alpha, prior_beta, like_beta
     # Prior
     #prior_log <- sapply(x, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
     #prior_star_log <- sapply(x_star, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
-    prior_log <- prior_star_log <- log(1/140)
+    #prior_log <- prior_star_log <- log(1/140)
     
     # Likelihood
     like_log <- likelihood_particle_beta(data, matrix(rep(x, d), ncol = d), matrix(rep(like_beta, N), ncol = d, byrow = T))
@@ -455,8 +469,10 @@ sub_mcmc <- function(data, alpha_update, x_0, prior_alpha, prior_beta, like_beta
     #like_star_log <- apply(data_and_x_star, 1, function(x) dbeta(x[1], x[3], like_beta[1], log = T) + dbeta(x[2], x[3], like_beta[2], log = T))
     
     # Posterior
-    post_log <- prior_log + like_log
-    post_star_log <- prior_star_log + like_star_log
+    #post_log <- prior_log + like_log
+    #post_star_log <- prior_star_log + like_star_log
+    post_log <- like_log
+    post_star_log <- like_star_log
     
     # Transition/proposal density
     x_and_x_star <- cbind(x, x_star)
@@ -557,4 +573,6 @@ root_mcmc <- function(data, alpha_update, x_0, prior_mu, prior_sigma, like_beta,
   
   return(x_post=x)
 }
+
+
 
