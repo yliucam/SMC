@@ -48,3 +48,23 @@ update(foo, burn_in)
 out <- coda.samples(model=foo, variable.names = parameters, n.iter = steps, thin = thin)
 
 outmatrix <- as.matrix(out)
+
+
+# Double check prior in JAGS model matches the simulated prior
+
+library(posterior, quietly = TRUE)
+library(tidybayes)
+
+no_data <- list()
+prior <- jags.model(textConnection(hier_bugs), data = no_data)
+prior_out <- coda.samples(model = prior,
+                          variable.names = parameters,
+                          n.iter = steps,
+                          thin = thin)
+prior_out_draws <- as_draws(prior_out)
+
+summary(extract_variable(prior_out_draws, "alpha")) # JAGS prior
+summary(rlnorm(10000, 3, 2)) # Prior in R
+
+summary(extract_variable(prior_out_draws, "alpha1")) # JAGS prior
+summary(sapply(rlnorm(10000, 3, 2), function(alpha) rgamma(1, alpha, 1))) # Prior in R
