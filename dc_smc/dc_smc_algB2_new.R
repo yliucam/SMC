@@ -60,14 +60,16 @@ dc_smc_algB2_new <- function(data,
   
   ## Root storage
   x_root <- rep(NA, N)
+  x_root_array <- array(rep(NA, N*nt), dim = c(N, nt))
   w_root_log <- array(rep(NA, N*nt), dim = c(N, nt))
   W_root <- rep(NA, N)
+  W_root_array <- array(rep(NA, N*nt), dim = c(N, nt))
   
   
   
   
   # Initialization
-  L_leaf_prod_log <- 0 # The logarithmic marginal likelihood on the leaf node 
+  L_leaf_prod_log <- 0 # The logarithmic marginal likelihood on the leaf node
   
   
   # Leaf nodes
@@ -118,17 +120,19 @@ dc_smc_algB2_new <- function(data,
       pc_int_log <- sum(sapply(x_leaf_mN[j,((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)], function(x) dbeta(x, mu, beta_prior$beta[sub_i*n_leaf/n_sub], log = T)))
       p_check_log[j,sub_i] <- (1-alpha)*pc_log + alpha*pc_int_log
       v_t_log[j,sub_i] <- p_check_log[j,sub_i] - pc_log
-      if (v_t_log[j,sub_i] < min_lim) v_t_log[j,sub_i] <- min_lim
+      # if (v_t_log[j,sub_i] < min_lim) v_t_log[j,sub_i] <- min_lim
     }
-    if (sum(exp(v_t_log[,sub_i])) == Inf) v_t_log[,sub_i] <- v_t_log[,sub_i] - max(v_t_log[,sub_i])
-    V_t <- exp(v_t_log[,sub_i])/sum(exp(v_t_log[,sub_i]))
+    # if (sum(exp(v_t_log[,sub_i])) == Inf) v_t_log[,sub_i] <- v_t_log[,sub_i] - max(v_t_log[,sub_i])
+    # V_t <- exp(v_t_log[,sub_i])/sum(exp(v_t_log[,sub_i]))
+    
+    V_t <- exp(v_t_log[,sub_i] - matrixStats::logSumExp(v_t_log[,sub_i]))
     
     U <- runif(1, 0, 1)
     A <- Sys_resamp(W=V_t, P=N, U=U)
     x_leaf_resamp[,,sub_i] <- x_leaf_mN[A,((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)]
     p_check_log_resamp[,sub_i] <- p_check_log[A,sub_i]
-    
-    L_prod_log <- L_prod_log + log(sum(exp(v_t_log[,sub_i]))) - log(m*N)
+
+    L_prod_log <- L_prod_log + matrixStats::logSumExp(v_t_log[,sub_i]) - log(m*N)
   }
   
   
@@ -174,11 +178,12 @@ dc_smc_algB2_new <- function(data,
         
         p_sub_current <-  (1-alpha_update)*p_sub_0_log + alpha_update*p_sub_t_log # Better to store here for the use by the next iteration!
         w_sub_log[,sub_i,i] <- w_log_0 + p_sub_current - p_sub_0_log
-        w_sub_log[,sub_i,i] <- weight_check(w_log = w_sub_log[,sub_i,i], min_lim = min_lim)
+        # w_sub_log[,sub_i,i] <- weight_check(w_log = w_sub_log[,sub_i,i], min_lim = min_lim)
+        #
+        # if (sum(exp(w_sub_log[,sub_i,i])) == Inf) w_sub_log[,sub_i,i] <- w_sub_log[,sub_i,i] - max(w_sub_log[,sub_i,i])
+        # W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i]) / sum(exp(w_sub_log[,sub_i,i]))
         
-        if (sum(exp(w_sub_log[,sub_i,i])) == Inf) w_sub_log[,sub_i,i] <- w_sub_log[,sub_i,i] - max(w_sub_log[,sub_i,i])
-        W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i]) / sum(exp(w_sub_log[,sub_i,i]))
-        
+        W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i] - matrixStats::logSumExp(w_sub_log[,sub_i,i]))
       }
       
       alpha_update <- alpha_update + alpha
@@ -196,7 +201,7 @@ dc_smc_algB2_new <- function(data,
       
       
       ### Marginal likelihood update
-      L_prod_log <- L_prod_log + log(sum(exp(w_sub_log[,sub_i,i+1]))) - log(N)
+      L_prod_log <- L_prod_log + matrixStats::logSumExp(w_sub_log[,sub_i,i+1]) - log(N)
       
       ### MCMC kernel
       var_sub <- var(x_sub_resamp)
@@ -225,11 +230,12 @@ dc_smc_algB2_new <- function(data,
         w_sub_log[,sub_i,i+1] <- w_sub_log[,sub_i,i] + p_sub_current - p_sub_prev
       }
       
-      w_sub_log[,sub_i,i+1] <- weight_check(w_log = w_sub_log[,sub_i,i+1], min_lim = min_lim)
-      
-      if (sum(exp(w_sub_log[,sub_i,i+1])) == Inf) w_sub_log[,sub_i,i+1] <- w_sub_log[,sub_i,i+1] - max(w_sub_log[,sub_i,i+1])
-      W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i+1]) / sum(exp(w_sub_log[,sub_i,i+1]))
-      
+      # w_sub_log[,sub_i,i+1] <- weight_check(w_log = w_sub_log[,sub_i,i+1], min_lim = min_lim)
+      #
+      # if (sum(exp(w_sub_log[,sub_i,i+1])) == Inf) w_sub_log[,sub_i,i+1] <- w_sub_log[,sub_i,i+1] - max(w_sub_log[,sub_i,i+1])
+      # W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i+1]) / sum(exp(w_sub_log[,sub_i,i+1]))
+
+      W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i+1] - matrixStats::logSumExp(w_sub_log[,sub_i,i+1]))
     }
     
     ### Resampling for x_t_nt -- optionally
@@ -241,7 +247,7 @@ dc_smc_algB2_new <- function(data,
     }
     
     ### Marginal likelihood update
-    L_prod_log <- L_prod_log + log(sum(exp(w_sub_log[,sub_i,nt]))) - log(N)
+    L_prod_log <- L_prod_log + matrixStats::logSumExp(w_sub_log[,sub_i,nt]) - log(N)
   }
   
   
@@ -274,17 +280,18 @@ dc_smc_algB2_new <- function(data,
       dgamma(x_sub_mN[j,2], mu, gamma_prior$beta[2], log = T)
     p_check_log[j] <- (1-alpha)*pc_log + alpha*pc_int_log
     v_t_log[j] <- p_check_log[j] - pc_log
-    if (v_t_log[j] < min_lim) v_t_log[j] <- min_lim
+    # if (v_t_log[j] < min_lim) v_t_log[j] <- min_lim
   }
-  if (sum(exp(v_t_log)) == Inf) v_t_log <- v_t_log - max(v_t_log)
-  V_t <- exp(v_t_log) / sum(exp(v_t_log))
+  # if (sum(exp(v_t_log)) == Inf) v_t_log <- v_t_log - max(v_t_log)
+  # V_t <- exp(v_t_log) / sum(exp(v_t_log))
+  V_t <- exp(v_t_log - matrixStats::logSumExp(v_t_log))
   
   U <- runif(1, 0, 1)
   A <- Sys_resamp(W=V_t, P=N, U=U)
   x_sub_resamp <- x_sub_mN[A,]
   p_check_log_resamp <- p_check_log[A]
   
-  L_prod_log <- L_prod_log + log(sum(exp(v_t_log))) - log(m*N)
+  L_prod_log <- L_prod_log + matrixStats::logSumExp(v_t_log) - log(m*N)
   
   
   
@@ -313,6 +320,7 @@ dc_smc_algB2_new <- function(data,
                           like_beta = gamma_prior$beta,
                           var_root = 1,
                           Ntotal = Ntotal_root)
+      x_root_array[,i] <- x_root
       
       ### Update weights
       q_root_log <- sapply(x_root, function(x) dlnorm(x, LN_prior$mu, LN_prior$sigma, log = T))
@@ -324,15 +332,20 @@ dc_smc_algB2_new <- function(data,
       p_root_t_log <- q_root_log + p_root_like_log
       p_root_current <- (1-alpha_update)*p_root_0_log + alpha_update*p_root_t_log # Store this for the next iteration
       w_root_log[,i] <- w_log_0 + p_root_current - p_root_0_log
-      w_root_log[,i] <- weight_check(w_log = w_root_log[,i], min_lim = min_lim)
       
-      if (sum(exp(w_root_log[,i])) == Inf) w_root_log[,i] <- w_root_log[,i] - max(w_root_log[,i])
-      W_root <- exp(w_root_log[,i]) / sum(exp(w_root_log[,i]))
+      # w_root_log[,i] <- weight_check(w_log = w_root_log[,i], min_lim = min_lim)
+      #
+      # if (sum(exp(w_root_log[,i])) == Inf) w_root_log[,i] <- w_root_log[,i] - max(w_root_log[,i])
+      # W_root <- exp(w_root_log[,i]) / sum(exp(w_root_log[,i]))
       
+      W_root <- exp(w_root_log[, i] - matrixStats::logSumExp(w_root_log[, i]))
+      
+      W_root_array[, i] <- W_root
     }
     
     alpha_update <- alpha_update + alpha
     p_root_prev <- p_root_current
+    x_root_prev <- x_root
     
     ### Resampling -- optionally
     ESS <- 1 / sum(W_root^2)
@@ -347,10 +360,13 @@ dc_smc_algB2_new <- function(data,
     
     
     ### Marginal likelihood update
-    L_prod_log <- L_prod_log + log(sum(exp(w_root_log[,i+1]))) - log(N)
+    L_prod_log <- L_prod_log + matrixStats::logSumExp(w_root_log[,i+1]) - log(N)
     
     ### MCMC kernel
-    var_root <- var(x_root_resamp)
+    var_root <- max(50, var(x_root_resamp))
+    if (isTRUE(all.equal(0, var_root))){
+      browser()
+    }
     x_root <- root_mcmc(data = x_sub_resamp,
                         x_0 = x_root_resamp,
                         prior_mu = LN_prior$mu,
@@ -358,6 +374,7 @@ dc_smc_algB2_new <- function(data,
                         like_beta = gamma_prior$beta,
                         var_root = var_root,
                         Ntotal = Ntotal_root)
+    x_root_array[,i+1] <- x_root
     
     
     ### Update weights
@@ -375,10 +392,18 @@ dc_smc_algB2_new <- function(data,
     } else {
       w_root_log[,i+1] <- w_root_log[,i] + p_root_current - p_root_prev
     }
-    w_root_log[,i+1] <- weight_check(w_log = w_root_log[,i+1], min_lim = min_lim)
-    
-    if (sum(exp(w_root_log[,i+1])) == Inf) w_root_log[,i+1] <- w_root_log[,i+1] - max(w_root_log[,i+1])
-    W_root <- exp(w_root_log[,i+1]) / sum(exp(w_root_log[,i+1]))
+    # if (i == 19){
+    #   browser()
+    # }
+
+    # w_root_log[,i+1] <- weight_check(w_log = w_root_log[,i+1], min_lim = min_lim)
+    #
+    # if (sum(exp(w_root_log[,i+1])) == Inf) w_root_log[,i+1] <- w_root_log[,i+1] - max(w_root_log[,i+1])
+    # W_root <- exp(w_root_log[,i+1]) / sum(exp(w_root_log[,i+1]))
+    #
+    W_root <- exp(w_root_log[, i+1] - matrixStats::logSumExp(w_root_log[, i+1]))
+
+    W_root_array[, i+1] <- W_root
   }
   
   ### Resampling for the x_t_nt -- optionally
@@ -390,11 +415,11 @@ dc_smc_algB2_new <- function(data,
   }
   
   ### Marginal likelihood update
-  L_prod_log <- L_prod_log + log(sum(exp(w_root_log[,nt]))) - log(N)
+  L_prod_log <- L_prod_log + matrixStats::logSumExp(w_root_log[,nt]) - log(N)
   
   
   
-  return(list(x_leaf = x_leaf, x_sub = x_sub, x_root = x_root))
+  return(list(x_leaf = x_leaf, x_sub = x_sub, x_root = x_root, x_root_array = x_root_array, W_root_array = W_root_array))
   
   
 }
