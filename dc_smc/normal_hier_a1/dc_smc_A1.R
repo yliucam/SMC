@@ -264,5 +264,5 @@ dc_smc_A1 <- function(data,
 
 debug(dc_smc_A1)
 
-out <- dc_smc_A1(data=y, N=1000, alpha=.2, Ntotal=50, prior_mu=0, prior_sigma=1)
+out <- dc_smc_A1(data=y, N=2000, alpha=.2, Ntotal=50, prior_mu=0, prior_sigma=1)
 
