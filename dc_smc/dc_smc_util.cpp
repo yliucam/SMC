@@ -88,7 +88,7 @@ arma::vec likelihood_particle_gamma(arma::mat obs,
   
   for (int i=0; i<N; ++i) {
     for (int j=0; j<p; ++j) {
-      res(i) = res(i) + R::dgamma(obs(i,j), alpha(i,j), beta(i,j), TRUE);
+      res(i) = res(i) + R::dgamma(obs(i,j), alpha(i,j), 1/beta(i,j), TRUE);
     }
   }
   
