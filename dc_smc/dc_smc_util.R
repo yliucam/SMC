@@ -13,8 +13,10 @@ sub_mcmc <- function(data, x_0, prior_alpha, prior_beta, like_beta, var_sub, Nto
       #x_star <- exp(mvrnorm(1, log(x_0), 2.38*diag(var_sub, N))) 
       
       # Prior
-      prior_log <- sapply(x_0, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
-      prior_star_log <- sapply(x_star, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
+      #prior_log <- sapply(x_0, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
+      #prior_star_log <- sapply(x_star, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
+      prior_log <- sapply(x_0, function(x) dunif(x, 0.001, 10000, log = T))
+      prior_star_log <- sapply(x_star, function(x) dunif(x, .001, 10000, log = T))
       
       # Likelihood
       like_log <- likelihood_particle_beta(data, matrix(rep(x_0, d), ncol = d), matrix(rep(like_beta, N), ncol = d, byrow = T))
@@ -49,8 +51,10 @@ sub_mcmc <- function(data, x_0, prior_alpha, prior_beta, like_beta, var_sub, Nto
     #x_star <- exp(mvrnorm(1, log(x), 2.38*diag(var_sub, N)))
     
     # Prior
-    prior_log <- sapply(x, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
-    prior_star_log <- sapply(x_star, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
+    #prior_log <- sapply(x, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
+    #prior_star_log <- sapply(x_star, function(x) dgamma(x, prior_alpha, prior_beta, log = T))
+    prior_log <- sapply(x, function(x) dunif(x, .001, 10000, log = T))
+    prior_star_log <- sapply(x_star, function(x) dunif(x, .001, 10000, log = T))
     
     # Likelihood
     like_log <- likelihood_particle_beta(data, matrix(rep(x, d), ncol = d), matrix(rep(like_beta, N), ncol = d, byrow = T))
@@ -99,8 +103,10 @@ root_mcmc <- function(data, x_0, prior_mu, prior_sigma, like_beta, var_root, Nto
       
       
       # Prior
-      prior_log <- sapply(x_0, function(x) dlnorm(x, prior_mu, prior_sigma, log = T))
-      prior_star_log <- sapply(x_star, function(x) dlnorm(x, prior_mu, prior_sigma, log = T))
+      #prior_log <- sapply(x_0, function(x) dlnorm(x, prior_mu, prior_sigma, log = T))
+      #prior_star_log <- sapply(x_star, function(x) dlnorm(x, prior_mu, prior_sigma, log = T))
+      prior_log <- sapply(x_0, function(x) dunif(x, .001, 10000, log = T))
+      prior_star_log <- sapply(x_star, function(x) dunif(x, .001, 10000, log = T))
       
       # Likelihood
       data_and_x <- cbind(data, x_0)
@@ -133,8 +139,10 @@ root_mcmc <- function(data, x_0, prior_mu, prior_sigma, like_beta, var_root, Nto
     #x_star <- exp(mvrnorm(1, log(x), 10*diag(N)))
     
     # Prior
-    prior_log <- sapply(x, function(x) dlnorm(x, prior_mu, prior_sigma, log = T))
-    prior_star_log <- sapply(x_star, function(x) dlnorm(x, prior_mu, prior_sigma, log = T))
+    #prior_log <- sapply(x, function(x) dlnorm(x, prior_mu, prior_sigma, log = T))
+    #prior_star_log <- sapply(x_star, function(x) dlnorm(x, prior_mu, prior_sigma, log = T))
+    prior_log <- sapply(x, function(x) dunif(x, .001, 10000, log = T))
+    prior_star_log <- sapply(x_star, function(x) dunif(x, .001, 10000, log = T))
     
     # Likelihood
     data_and_x <- cbind(data, x)
