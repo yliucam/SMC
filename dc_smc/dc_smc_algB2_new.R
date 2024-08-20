@@ -159,8 +159,8 @@ dc_smc_algB2_new <- function(data,
         p_sub_like_log <- likelihood_particle_beta(obs = x_leaf_resamp[,,sub_i],
                                                    alpha = matrix(rep(x_sub_0, n_leaf/n_sub), ncol = n_leaf/n_sub),
                                                    beta = matrix(rep(beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)], N), ncol=n_leaf/n_sub, byrow=T))
-        #p_sub_prior_log <- q_sub_log # Note: at the first iteration, the prior is the same as q_sub in this example!
-        #p_sub_t_log <- p_sub_prior_log + p_sub_like_log 
+        p_sub_prior_log <- q_sub_log # Note: at the first iteration, the prior is the same as q_sub in this example!
+        p_sub_t_log <- p_sub_prior_log + p_sub_like_log 
         p_sub_t_log <- p_sub_like_log
         
         p_sub_current <-  (1-alpha_update)*p_sub_0_log + alpha_update*p_sub_t_log
@@ -190,6 +190,7 @@ dc_smc_algB2_new <- function(data,
                                   prior_alpha = gamma_prior$alpha[sub_i],
                                   prior_beta = gamma_prior$beta[sub_i],
                                   like_beta = beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)],
+                                  alpha_j = alpha_update,
                                   var_sub = 1,
                                   Ntotal = Ntotal_sub)
         
@@ -203,7 +204,8 @@ dc_smc_algB2_new <- function(data,
                                                  alpha = matrix(rep(x_sub[,sub_i], n_leaf/n_sub), ncol = n_leaf/n_sub),
                                                  beta = matrix(rep(beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)], N), ncol=n_leaf/n_sub, byrow=T))
       #p_sub_prior_log <- sapply(x_sub[,sub_i], function(x) dgamma(x, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i], log = T))
-      #p_sub_t_log <- p_sub_prior_log + p_sub_like_log
+      p_sub_prior_log <- q_sub_log
+      p_sub_t_log <- p_sub_prior_log + p_sub_like_log
       p_sub_t_log <- p_sub_like_log
       p_sub_prev <-  (1-alpha_update)*p_sub_0_log + alpha_update*p_sub_t_log
       
@@ -249,6 +251,7 @@ dc_smc_algB2_new <- function(data,
                                 prior_alpha = gamma_prior$alpha[sub_i],
                                 prior_beta = gamma_prior$beta[sub_i],
                                 like_beta = beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)],
+                                alpha_j = alpha_update,
                                 var_sub = var_sub,
                                 Ntotal = Ntotal_sub)
     }
@@ -277,25 +280,27 @@ dc_smc_algB2_new <- function(data,
   p_check_log_resamp <- rep(NA, N) # Store the N corresponding log pi_check
   
   
-  mu <- exp(LN_prior$mu + (LN_prior$sigma)^2/2)
-  for (j in 1:(m*N)) {
-    pc_log <- sum(log(W_sub_mN[j,]))
-    pc_int_log <- dgamma(x_sub_mN[j,1], mu, gamma_prior$beta[1], log = T) +
-      dgamma(x_sub_mN[j,2], mu, gamma_prior$beta[2], log = T)
-    p_check_log[j] <- (1-alpha)*pc_log + alpha*pc_int_log
-    v_t_log[j] <- p_check_log[j] - pc_log
+  #mu <- exp(LN_prior$mu + (LN_prior$sigma)^2/2)
+  #for (j in 1:(m*N)) {
+    #pc_log <- sum(log(W_sub_mN[j,]))
+    #pc_int_log <- dgamma(x_sub_mN[j,1], mu, gamma_prior$beta[1], log = T) +
+    #  dgamma(x_sub_mN[j,2], mu, gamma_prior$beta[2], log = T)
+    #p_check_log[j] <- (1-alpha)*pc_log + alpha*pc_int_log
+    #v_t_log[j] <- p_check_log[j] - pc_log
     # if (v_t_log[j] < min_lim) v_t_log[j] <- min_lim
-  }
+  #}
   # if (sum(exp(v_t_log)) == Inf) v_t_log <- v_t_log - max(v_t_log)
   # V_t <- exp(v_t_log) / sum(exp(v_t_log))
-  V_t <- exp(v_t_log - matrixStats::logSumExp(v_t_log))
+  #V_t <- exp(v_t_log - matrixStats::logSumExp(v_t_log))
   
-  U <- runif(1, 0, 1)
-  A <- Sys_resamp(W=V_t, P=N, U=U)
-  x_sub_resamp <- x_sub_mN[A,]
-  p_check_log_resamp <- p_check_log[A]
+  #U <- runif(1, 0, 1)
+  #A <- Sys_resamp(W=V_t, P=N, U=U)
+  #x_sub_resamp <- x_sub_mN[A,]
+  #p_check_log_resamp <- p_check_log[A]
+  p_check_log_resamp <- rowMeans(log(W_sub))
+  x_sub_resamp <- x_sub
   
-  L_prod_log <- L_prod_log + matrixStats::logSumExp(v_t_log) - log(m*N)
+  #L_prod_log <- L_prod_log + matrixStats::logSumExp(v_t_log) - log(m*N)
   
   
   
@@ -318,8 +323,8 @@ dc_smc_algB2_new <- function(data,
       p_root_like_log <- likelihood_particle_gamma(obs=x_sub_resamp,
                                                    alpha=cbind(x_root_0, x_root_0),
                                                    beta=matrix(rep(gamma_prior$beta, N), ncol=2, byrow=T))
-      #p_root_prior_log <- q_root_log
-      #p_root_t_log <- p_root_prior_log + p_root_like_log
+      p_root_prior_log <- q_root_log
+      p_root_t_log <- p_root_prior_log + p_root_like_log
       p_root_t_log <- p_root_like_log
       p_root_current <- (1-alpha_update)*p_root_0_log + alpha_update*p_root_t_log 
       w_root_log[,i] <- w_log_0 + p_root_current - p_root_0_log
@@ -351,6 +356,7 @@ dc_smc_algB2_new <- function(data,
                           prior_mu = LN_prior$mu,
                           prior_sigma = LN_prior$sigma,
                           like_beta = gamma_prior$beta,
+                          alpha_j = alpha_update,
                           var_root = 1,
                           Ntotal = Ntotal_root)
       x_root_array[,i] <- x_root
@@ -364,7 +370,8 @@ dc_smc_algB2_new <- function(data,
                                                  alpha = cbind(x_root, x_root),
                                                  beta = matrix(rep(gamma_prior$beta, N), ncol=2, byrow=T))
     #p_root_prior_log <- sapply(x_root, function(x) dlnorm(x, LN_prior$mu, LN_prior$sigma, log = T))
-    #p_root_t_log <- p_root_prior_log + p_root_like_log
+    p_root_prior_log <- q_root_log
+    p_root_t_log <- p_root_prior_log + p_root_like_log
     p_root_t_log <- p_root_like_log
     p_root_prev <- (1-alpha_update)*p_root_0_log + alpha_update*p_root_t_log
     
@@ -417,6 +424,7 @@ dc_smc_algB2_new <- function(data,
                         prior_mu = LN_prior$mu,
                         prior_sigma = LN_prior$sigma,
                         like_beta = gamma_prior$beta,
+                        alpha_j = alpha_update,
                         var_root = var_root,
                         Ntotal = Ntotal_root)
     x_root_array[,i+1] <- x_root
