@@ -32,7 +32,6 @@ dc_smc_algB2_new <- function(data,
                              n_trial,
                              beta_prior,
                              gamma_prior,
-                             LN_prior,
                              m,
                              alpha,
                              Ntotal_sub,
@@ -108,31 +107,38 @@ dc_smc_algB2_new <- function(data,
   
   ## Resampling N matchings from the mN matchings above based on V_t
   
-  v_t_log <- array(rep(NA, m*N*n_sub), dim = c(m*N, n_sub))
-  p_check_log <- array(rep(NA, m*N*n_sub), dim = c(m*N, n_sub))
-  x_leaf_resamp <- array(rep(NA, N*(n_leaf/n_sub)*n_sub), dim = c(N, n_leaf/n_sub, n_sub)) # Store the N resampling matchings
-  p_check_log_resamp <- array(rep(NA, N*n_sub), dim = c(N, n_sub)) # Store the N corresponding log pi_check
+  #v_t_log <- array(rep(NA, m*N*n_sub), dim = c(m*N, n_sub))
+  #p_check_log <- array(rep(NA, m*N*n_sub), dim = c(m*N, n_sub))
+  #x_leaf_resamp <- array(rep(NA, N*(n_leaf/n_sub)*n_sub), dim = c(N, n_leaf/n_sub, n_sub)) # Store the N resampling matchings
+  #p_check_log_resamp <- array(rep(NA, N*n_sub), dim = c(N, n_sub)) # Store the N corresponding log pi_check
   
-  for (sub_i in 1:n_sub) {
-    mu <- gamma_prior$alpha[sub_i] / gamma_prior$beta[sub_i]
-    for (j in 1:(m*N)) {
-      pc_log <- sum(log(W_leaf_mN[j,((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)]))
-      pc_int_log <- sum(sapply(x_leaf_mN[j,((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)], function(x) dbeta(x, mu, beta_prior$beta[sub_i*n_leaf/n_sub], log = T)))
-      p_check_log[j,sub_i] <- (1-alpha)*pc_log + alpha*pc_int_log
-      v_t_log[j,sub_i] <- p_check_log[j,sub_i] - pc_log
+  #for (sub_i in 1:n_sub) {
+  #  mu <- gamma_prior$alpha[sub_i] / gamma_prior$beta[sub_i]
+  #  for (j in 1:(m*N)) {
+  #    pc_log <- sum(log(W_leaf_mN[j,((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)]))
+  #    pc_int_log <- sum(sapply(x_leaf_mN[j,((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)], function(x) dbeta(x, mu, beta_prior$beta[sub_i*n_leaf/n_sub], log = T)))
+  #    p_check_log[j,sub_i] <- (1-alpha)*pc_log + alpha*pc_int_log
+  #    v_t_log[j,sub_i] <- p_check_log[j,sub_i] - pc_log
       # if (v_t_log[j,sub_i] < min_lim) v_t_log[j,sub_i] <- min_lim
-    }
+  #  }
     # if (sum(exp(v_t_log[,sub_i])) == Inf) v_t_log[,sub_i] <- v_t_log[,sub_i] - max(v_t_log[,sub_i])
     # V_t <- exp(v_t_log[,sub_i])/sum(exp(v_t_log[,sub_i]))
     
-    V_t <- exp(v_t_log[,sub_i] - matrixStats::logSumExp(v_t_log[,sub_i]))
+  #  V_t <- exp(v_t_log[,sub_i] - matrixStats::logSumExp(v_t_log[,sub_i]))
     
-    U <- runif(1, 0, 1)
-    A <- Sys_resamp(W=V_t, P=N, U=U)
-    x_leaf_resamp[,,sub_i] <- x_leaf_mN[A,((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)]
-    p_check_log_resamp[,sub_i] <- p_check_log[A,sub_i]
+  #  U <- runif(1, 0, 1)
+  #  A <- Sys_resamp(W=V_t, P=N, U=U)
+  #  x_leaf_resamp[,,sub_i] <- x_leaf_mN[A,((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)]
+  #  p_check_log_resamp[,sub_i] <- p_check_log[A,sub_i]
 
-    L_prod_log <- L_prod_log + matrixStats::logSumExp(v_t_log[,sub_i]) - log(m*N)
+  #  L_prod_log <- L_prod_log + matrixStats::logSumExp(v_t_log[,sub_i]) - log(m*N)
+  #}
+  p_check_log_resamp <- array(rep(NA, N*n_sub), dim = c(N, n_sub))
+  x_leaf_resamp <- array(rep(NA, N*(n_leaf/n_sub)*n_sub), dim = c(N, n_leaf/n_sub, n_sub))
+  
+  for (sub_i in 1:n_sub) {
+    x_leaf_resamp[,,sub_i] <- x_leaf[,((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)]
+    p_check_log_resamp[,sub_i] <- rowMeans(W_leaf[,((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)])
   }
   
   
@@ -142,7 +148,6 @@ dc_smc_algB2_new <- function(data,
   
   for (sub_i in 1:n_sub) {
     ## Initialization
-    #x_sub_0 <- rgamma(N, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i])
     x_sub_0 <- runif(N, 0.001, 10000)
     w_log_0 <- rep(0, N)
     
@@ -153,22 +158,19 @@ dc_smc_algB2_new <- function(data,
       if (i == 1) {
         
         ### Update weights
-        #q_sub_log <- sapply(x_sub_0, function(x) dgamma(x, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i], log = T))
-        q_sub_log <- sapply(x_sub_0, function(x) dunif(x, .001, 10000, log = T))
-        p_sub_0_log <- p_check_log_resamp[,sub_i] + q_sub_log
+        #q_sub_log <- sapply(x_sub_0, function(x) dunif(x, .001, 10000, log = T))
+        #p_sub_0_log <- p_check_log_resamp[,sub_i] + q_sub_log
+        p_sub_0_log <- p_check_log_resamp[,sub_i]
         p_sub_like_log <- likelihood_particle_beta(obs = x_leaf_resamp[,,sub_i],
                                                    alpha = matrix(rep(x_sub_0, n_leaf/n_sub), ncol = n_leaf/n_sub),
                                                    beta = matrix(rep(beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)], N), ncol=n_leaf/n_sub, byrow=T))
-        p_sub_prior_log <- q_sub_log # Note: at the first iteration, the prior is the same as q_sub in this example!
-        p_sub_t_log <- p_sub_prior_log + p_sub_like_log 
+        #p_sub_prior_log <- q_sub_log # Note: at the first iteration, the prior is the same as q_sub in this example!
+        #p_sub_t_log <- p_sub_prior_log + p_sub_like_log 
         p_sub_t_log <- p_sub_like_log
         
         p_sub_current <-  (1-alpha_update)*p_sub_0_log + alpha_update*p_sub_t_log
         w_sub_log[,sub_i,i] <- w_log_0 + p_sub_current - p_sub_0_log
-        # w_sub_log[,sub_i,i] <- weight_check(w_log = w_sub_log[,sub_i,i], min_lim = min_lim)
-        #
-        # if (sum(exp(w_sub_log[,sub_i,i])) == Inf) w_sub_log[,sub_i,i] <- w_sub_log[,sub_i,i] - max(w_sub_log[,sub_i,i])
-        # W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i]) / sum(exp(w_sub_log[,sub_i,i]))
+        w_sub_log[which(w_sub_log[,sub_i,i] < min_lim), sub_i, i] <- min_lim
         
         W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i] - matrixStats::logSumExp(w_sub_log[,sub_i,i]))
         
@@ -187,25 +189,22 @@ dc_smc_algB2_new <- function(data,
         #var_sub <- var(x_sub_resamp)
         x_sub[,sub_i] <- sub_mcmc(data = x_leaf_resamp[,,sub_i],
                                   x_0 = x_sub_resamp,
-                                  prior_alpha = gamma_prior$alpha[sub_i],
-                                  prior_beta = gamma_prior$beta[sub_i],
                                   like_beta = beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)],
-                                  alpha_j = alpha_update,
                                   var_sub = 1,
                                   Ntotal = Ntotal_sub)
         
       }
       
       ### Update p_sub_prev
-      #q_sub_log <- sapply(x_sub[,sub_i], function(x) dgamma(x, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i], log = T))
-      q_sub_log <- sapply(x_sub[,sub_i], function(x) dunif(x, .001, 10000, log = T))
-      p_sub_0_log <- p_check_log_resamp[,sub_i] + q_sub_log
+      #q_sub_log <- sapply(x_sub[,sub_i], function(x) dunif(x, .001, 10000, log = T))
+      #p_sub_0_log <- p_check_log_resamp[,sub_i] + q_sub_log
+      p_sub_0_log <- p_check_log_resamp[,sub_i]
       p_sub_like_log <- likelihood_particle_beta(obs = x_leaf_resamp[,,sub_i],
                                                  alpha = matrix(rep(x_sub[,sub_i], n_leaf/n_sub), ncol = n_leaf/n_sub),
                                                  beta = matrix(rep(beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)], N), ncol=n_leaf/n_sub, byrow=T))
       #p_sub_prior_log <- sapply(x_sub[,sub_i], function(x) dgamma(x, gamma_prior$alpha[sub_i], gamma_prior$beta[sub_i], log = T))
-      p_sub_prior_log <- q_sub_log
-      p_sub_t_log <- p_sub_prior_log + p_sub_like_log
+      #p_sub_prior_log <- q_sub_log
+      #p_sub_t_log <- p_sub_prior_log + p_sub_like_log
       p_sub_t_log <- p_sub_like_log
       p_sub_prev <-  (1-alpha_update)*p_sub_0_log + alpha_update*p_sub_t_log
       
@@ -221,12 +220,8 @@ dc_smc_algB2_new <- function(data,
       } else {
         w_sub_log[,sub_i,i+1] <- w_sub_log[,sub_i,i] + p_sub_current - p_sub_prev
       }
+      w_sub_log[which(w_sub_log[,sub_i,i+1] < min_lim), sub_i, i+1] <- min_lim
       
-      # w_sub_log[,sub_i,i+1] <- weight_check(w_log = w_sub_log[,sub_i,i+1], min_lim = min_lim)
-      #
-      # if (sum(exp(w_sub_log[,sub_i,i+1])) == Inf) w_sub_log[,sub_i,i+1] <- w_sub_log[,sub_i,i+1] - max(w_sub_log[,sub_i,i+1])
-      # W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i+1]) / sum(exp(w_sub_log[,sub_i,i+1]))
-
       W_sub[,sub_i] <- exp(w_sub_log[,sub_i,i+1] - matrixStats::logSumExp(w_sub_log[,sub_i,i+1]))
       
       ### Resampling -- optionally
@@ -248,10 +243,7 @@ dc_smc_algB2_new <- function(data,
       var_sub <- var(x_sub_resamp)
       x_sub[,sub_i] <- sub_mcmc(data = x_leaf_resamp[,,sub_i],
                                 x_0 = x_sub_resamp,
-                                prior_alpha = gamma_prior$alpha[sub_i],
-                                prior_beta = gamma_prior$beta[sub_i],
                                 like_beta = beta_prior$beta[((sub_i-1)*n_leaf/n_sub+1):(sub_i*n_leaf/n_sub)],
-                                alpha_j = alpha_update,
                                 var_sub = var_sub,
                                 Ntotal = Ntotal_sub)
     }
@@ -317,22 +309,18 @@ dc_smc_algB2_new <- function(data,
     if (i == 1) {
       
       ### Update weights
-      #q_root_log <- sapply(x_root_0, function(x) dlnorm(x, LN_prior$mu, LN_prior$sigma, log = T))
-      q_root_log <- sapply(x_root_0, function(x) dunif(x, .001, 10000, log = T))
-      p_root_0_log <- p_check_log_resamp + q_root_log
+      #q_root_log <- sapply(x_root_0, function(x) dunif(x, .001, 10000, log = T))
+      #p_root_0_log <- p_check_log_resamp + q_root_log
+      p_root_0_log <- p_check_log_resamp
       p_root_like_log <- likelihood_particle_gamma(obs=x_sub_resamp,
                                                    alpha=cbind(x_root_0, x_root_0),
                                                    beta=matrix(rep(gamma_prior$beta, N), ncol=2, byrow=T))
-      p_root_prior_log <- q_root_log
-      p_root_t_log <- p_root_prior_log + p_root_like_log
+      #p_root_prior_log <- q_root_log
       p_root_t_log <- p_root_like_log
       p_root_current <- (1-alpha_update)*p_root_0_log + alpha_update*p_root_t_log 
       w_root_log[,i] <- w_log_0 + p_root_current - p_root_0_log
       
-      # w_root_log[,i] <- weight_check(w_log = w_root_log[,i], min_lim = min_lim)
-      #
-      # if (sum(exp(w_root_log[,i])) == Inf) w_root_log[,i] <- w_root_log[,i] - max(w_root_log[,i])
-      # W_root <- exp(w_root_log[,i]) / sum(exp(w_root_log[,i]))
+      w_root_log[which(w_root_log[,i] < min_lim), i] <- min_lim
       
       W_root <- exp(w_root_log[, i] - matrixStats::logSumExp(w_root_log[, i]))
       
@@ -353,10 +341,7 @@ dc_smc_algB2_new <- function(data,
       #var_root <- var(x_root_resamp)
       x_root <- root_mcmc(data = x_sub_resamp,
                           x_0 = x_root_resamp,
-                          prior_mu = LN_prior$mu,
-                          prior_sigma = LN_prior$sigma,
                           like_beta = gamma_prior$beta,
-                          alpha_j = alpha_update,
                           var_root = 1,
                           Ntotal = Ntotal_root)
       x_root_array[,i] <- x_root
@@ -364,14 +349,13 @@ dc_smc_algB2_new <- function(data,
     
     ### Update p_root_prev
     #q_root_log <- sapply(x_root, function(x) dlnorm(x, LN_prior$mu, LN_prior$sigma, log = T))
-    q_root_log <- sapply(x_root, function(x) dunif(x, .001, 10000, log = T))
-    p_root_0_log <- p_check_log_resamp + q_root_log
+    #q_root_log <- sapply(x_root, function(x) dunif(x, .001, 10000, log = T))
+    #p_root_0_log <- p_check_log_resamp + q_root_log
+    p_root_0_log <- p_check_log_resamp
     p_root_like_log <- likelihood_particle_gamma(obs = x_sub_resamp,
                                                  alpha = cbind(x_root, x_root),
                                                  beta = matrix(rep(gamma_prior$beta, N), ncol=2, byrow=T))
-    #p_root_prior_log <- sapply(x_root, function(x) dlnorm(x, LN_prior$mu, LN_prior$sigma, log = T))
-    p_root_prior_log <- q_root_log
-    p_root_t_log <- p_root_prior_log + p_root_like_log
+    #p_root_prior_log <- q_root_log
     p_root_t_log <- p_root_like_log
     p_root_prev <- (1-alpha_update)*p_root_0_log + alpha_update*p_root_t_log
     
@@ -385,16 +369,9 @@ dc_smc_algB2_new <- function(data,
     } else {
       w_root_log[,i+1] <- w_root_log[,i] + p_root_current - p_root_prev
     }
-    # if (i == 19){
-    #   browser()
-    # }
-
-    # w_root_log[,i+1] <- weight_check(w_log = w_root_log[,i+1], min_lim = min_lim)
-    #
-    # if (sum(exp(w_root_log[,i+1])) == Inf) w_root_log[,i+1] <- w_root_log[,i+1] - max(w_root_log[,i+1])
-    # W_root <- exp(w_root_log[,i+1]) / sum(exp(w_root_log[,i+1]))
-    #
-    W_root <- exp(w_root_log[, i+1] - matrixStats::logSumExp(w_root_log[, i+1]))
+    w_root_log[which(w_root_log[,i+1] < min_lim), i+1] <- min_lim
+   
+    W_root <- exp(w_root_log[,i+1] - matrixStats::logSumExp(w_root_log[,i+1]))
 
     W_root_array[, i+1] <- W_root
     
@@ -421,11 +398,8 @@ dc_smc_algB2_new <- function(data,
     }
     x_root <- root_mcmc(data = x_sub_resamp,
                         x_0 = x_root_resamp,
-                        prior_mu = LN_prior$mu,
-                        prior_sigma = LN_prior$sigma,
                         like_beta = gamma_prior$beta,
-                        alpha_j = alpha_update,
-                        var_root = var_root,
+                        var_root = 1,
                         Ntotal = Ntotal_root)
     x_root_array[,i+1] <- x_root
     
