@@ -5,57 +5,40 @@ alpha <- rlnorm(1, 3, 2)
 alpha1 <- rgamma(1, alpha, 1)
 alpha2 <- rgamma(1, alpha, .5)
 
-p11 <- rbeta(1, alpha1, 2)
-p12 <- rbeta(1, alpha1, 2)
-p13 <- rbeta(1, alpha1, 2)
-p14 <- rbeta(1, alpha1, 2)
+p1 <- rbeta(30, alpha1, 2)
+p2 <- rbeta(30, alpha2, 10)
 
-p21 <- rbeta(1, alpha2, 10)
-p22 <- rbeta(1, alpha2, 10)
-p23 <- rbeta(1, alpha2, 10)
-p24 <- rbeta(1, alpha2, 10)
-
-y11 <- rbinom(20, 100, p11)
-y12 <- rbinom(20, 100, p12)
-y13 <- rbinom(20, 100, p13)
-y14 <- rbinom(20, 100, p14)
-
-y21 <- rbinom(20, 200, p21)
-y22 <- rbinom(20, 200, p22)
-y23 <- rbinom(20, 200, p23)
-y24 <- rbinom(20, 200, p24)
+y1 <- matrix(rep(NA, 20*30), ncol = 30)
+y2 <- matrix(rep(NA, 20*30), ncol = 30)
+for (i in 1:30) {
+  y1[,i] <- rbinom(20, 100, p1[i])
+  y2[,i] <- rbinom(20, 200, p2[i])
+}
 
 
-par(mfrow=c(2,2))
-hist(y11)
-hist(y12)
-hist(y21)
-hist(y22)
-
-data1 <- cbind(y11, y12, y13, y14, y21, y22, y23, y24)
-
+data1 <- cbind(y1, y2)
 
 library(Rcpp)
 library(MASS)
-sourceCpp("dc_smc_util.cpp")
-source("dc_smc_util.R")
-source("dc_smc_leaf_binom.R")
+sourceCpp("C:/Users/Yixuan/Documents/codes/SMC/dc_smc/dc_smc_util.cpp")
+source("C:/Users/Yixuan/Documents/codes/SMC/dc_smc/dc_smc_util.R")
+source("C:/Users/Yixuan/Documents/codes/SMC/dc_smc/dc_smc_leaf_binom.R")
 
-source("dc_smc_algB2_new.R")
+source("C:/Users/Yixuan/Documents/codes/SMC/dc_smc/dc_smc_algB2_new.R")
 
 
-beta_prior <- list(alpha=rep(1, 8), beta=c(rep(2, 4), rep(10, 4)))
-n_trial <- c(rep(100, 4), rep(200, 4))
-gamma_prior <- list(alpha = c(1, 1), beta = c(1, .5))
-LN_prior <- list(mu = 3, sigma = 2)
+beta_prior <- list(alpha=rep(1, 60), beta=c(rep(2, 30), rep(10, 30)))
+n_trial <- c(rep(100, 30), rep(200, 30))
+gamma_prior <- list(beta = c(1, .5))
+
+debug(dc_smc_algB2_new)
 
 out_smc <- dc_smc_algB2_new(data = data1, 
                         n_trial = n_trial,
-                        N = 1000,
-                        nodes_n = c(1, 2, 8),
+                        N = 5000,
+                        nodes_n = c(1, 2, 60),
                         beta_prior = beta_prior,
                         gamma_prior = gamma_prior,
-                        LN_prior = LN_prior,
                         m = 2,
                         alpha = .05,
                         Ntotal_sub = 5,
