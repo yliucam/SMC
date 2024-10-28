@@ -7,11 +7,11 @@ hier_bugs <- "model
   alpha1 ~ dgamma(alpha, 1)
   alpha2 ~ dgamma(alpha, .5)
   
-  for (i in 1:30) {
+  for (i in 1:50) {
     p1[i] ~ dbeta(alpha1, 2)
     p2[i] ~ dbeta(alpha2, 10)
     
-    for (j in 1:20) {
+    for (j in 1:50) {
       y1[j,i] ~ dbin(p1[i], 100)
       y2[j,i] ~ dbin(p2[i], 200)
     }
@@ -36,6 +36,8 @@ foo <- jags.model(textConnection(hier_bugs), data = data)
 update(foo, burn_in)
 
 jags <- coda.samples(model=foo, variable.names = parameters, n.iter = steps, thin = thin)
+
+
 
 library(posterior, quietly = TRUE)
 library(tidybayes)

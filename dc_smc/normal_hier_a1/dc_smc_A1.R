@@ -112,25 +112,31 @@ dc_smc_A1 <- function(data,
       alpha_update <- alpha
       
       ## Proposal
-      theta_tilde <- sapply(theta_0, function(x) rexp(1, 1/x))
+      #theta_tilde <- sapply(theta_0, function(x) rexp(1, 1/x))
       
       w_log_0 <- 0
       for (i in 1:nt) {
         if (i == 1) {
           ## Update weights
-          q_t_log <- apply(cbind(theta_tilde, theta_0), 1, function(x) dexp(x[1], 1/x[2], log = T))
-          p_c_prod_log <- w_leaf_log[,t] + w_theta0_log
-          gamma_t_0_log <- p_c_prod_log + q_t_log
-          p_prev_log <- gamma_t_0_log
+          q_t_log <- sapply(x_leaf[,t], function(x) dnorm(x, data[t], 1, log = T))
           
-          gamma_t_nt_log <- theta_0_prior_log + theta_density_forward_log + theta_like_log + x_like_log 
+          #p_c_prod_log <- w_leaf_log[,t] + w_theta0_log
+          #gamma_t_0_log <- p_c_prod_log + q_t_log
+          #p_prev_log <- gamma_t_0_log
           
-          p_current_log <- (1-alpha_update)*gamma_t_0_log + alpha_update*gamma_t_nt_log
+          #gamma_t_nt_log <- theta_0_prior_log + theta_density_forward_log + theta_like_log + x_like_log
+          #gamma_t_nt_temp_log <- gamma_t_nt_log + q_t_log
           
-          w_log[,t] <- w_log_0 + p_current_log - p_prev_log
+          #p_current_log <- (1-alpha_update)*gamma_t_0_log + alpha_update*gamma_t_nt_temp_log
+          
+          p_x_log <- apply(cbind(x_leaf[,t], theta_0), 1, function(x) dnorm(x[1], 0, x[2], log = T))
+          
+          #w_log[,t] <- w_log_0 + p_current_log - p_prev_log
           #w_log[,t] <- weight_check(w_log = w_log[,t], min_lim = min_lim)
           #if (sum(exp(w_log[,t])) == Inf) w_log[,t] <- w_log[,t] - max(w_log[,t])
           #W[,t] <- exp(w_log[,t]) / sum(exp(w_log[,t]))
+          
+          w_log[,t] <- w_log_0 + (1-alpha_update)*q_t_log + alpha_update*p_x_log - q_t_log
           
           W[,t] <- exp(w_log[,t] - matrixStats::logSumExp(w_log[,t]))
           
@@ -138,24 +144,23 @@ dc_smc_A1 <- function(data,
           ## Resampling
           U <- runif(1, 0, 1)
           A <- Sys_resamp(W = W[,t], P = N, U = U)
-          theta_resamp <- theta_tilde[A]
-          
+          #theta_resamp <- theta_tilde[A]
+          x_resamp <- x_leaf[A,t]
           
           ## MCMC kernel
-          theta[,t] <- mcmc_kernel(data = x_leaf[,t+1], node = t, theta_init = theta_tilde, prior_lambda = theta_0, N = N, Ntotal = Ntotal)
+          theta[,t] <- mcmc_kernel(data = y[t], x_init = x_resamp, theta_init = theta_0, prior_lambda = theta_0, N = N, Ntotal = Ntotal)
         }
         
         alpha_update <- alpha_update + alpha
         p_prev_log <- p_current_log
         
         ## Update weights
-        q_t_log <- apply(cbind(theta[,t], theta_0), 1, function(x) dexp(x[1], 1/x[2], log = T))
-        gamma_t_0_log <- p_c_prod_log + q_t_log
+        gamma_t_nt_temp_log <- gamma_t_nt_log + apply(cbind(theta[,t], theta_0), 1, function(x) dexp(x[1], 1/x[2], log = T))
         
         #theta_density_forward_temp_log <- theta_density_forward_log
         #theta_density_forward_temp_log <- theta_density_forward_temp_log + sapply(cbind(theta[,t], theta_0), function(x) dexp(x[1], x[2], log = T))
         #gamma_t_nt_log <- theta_0_prior_log + theta_density_forward_temp_log + theta_like_log + x_like_log
-        p_current_log <- (1-alpha_update)*gamma_t_0_log + alpha_update*gamma_t_nt_log
+        p_current_log <- (1-alpha_update)*gamma_t_0_log + alpha_update*gamma_t_nt_temp_log
         
         w_log[,t] <- w_log_0 + p_current_log - p_prev_log ## Resampling for all iterations
         #w_log[,t] <- weight_check(w_log = w_log[,t], min_lim = min_lim)
@@ -196,13 +201,15 @@ dc_smc_A1 <- function(data,
       if (i == 1) {
         ## Update weights
         q_t_log <- apply(cbind(theta_tilde, theta[,t]), 1, function(x) dexp(x[1], 1/x[2], log = T))
+        
         p_c_prod_log <- w_leaf_log[,t+1] + w_log[,t]
         gamma_t_0_log <- p_c_prod_log + q_t_log
         p_prev_log <- gamma_t_0_log
         
-        gamma_t_nt_log <- theta_0_prior_log + theta_density_forward_log + theta_like_log + x_like_log 
+        gamma_t_nt_log <- theta_0_prior_log + theta_density_forward_log + theta_like_log + x_like_log
+        gamma_t_nt_temp_log <- gamma_t_nt_log + q_t_log
         
-        p_current_log <- (1-alpha_update)*gamma_t_0_log + alpha_update*gamma_t_nt_log
+        p_current_log <- (1-alpha_update)*gamma_t_0_log + alpha_update*gamma_t_nt_temp_log
         
         w_log[,t+1] <- w_log_0 + p_current_log - p_prev_log
         #w_log[,t] <- weight_check(w_log = w_log[,t], min_lim = min_lim)
@@ -224,10 +231,9 @@ dc_smc_A1 <- function(data,
       p_prev_log <- p_current_log
       
       ## Update weights
-      q_t_log <- apply(cbind(theta[,t+1], theta[,t]), 1, function(x) dexp(x[1], 1/x[2], log = T))
-      gamma_t_0_log <- p_c_prod_log + q_t_log
+      gamma_t_nt_temp_log <- gamma_t_nt_log + apply(cbind(theta[,t+1], theta[,t]), 1, function(x) dexp(x[1], 1/x[2], log = T))
       
-      p_current_log <- (1-alpha_update)*gamma_t_0_log + alpha_update*gamma_t_nt_log
+      p_current_log <- (1-alpha_update)*gamma_t_0_log + alpha_update*gamma_t_nt_temp_log
       
       w_log[,t+1] <- w_log_0 + p_current_log - p_prev_log ## Resampling for all iterations
       #w_log[,t] <- weight_check(w_log = w_log[,t], min_lim = min_lim)
@@ -254,8 +260,15 @@ dc_smc_A1 <- function(data,
     
   }
   
+  w_T_log <- apply(cbind(x_leaf[,n], theta[,n]), 1, function(x) dnorm(x[1], 0, x[2], log = T))
+  W_T <- exp(w_T_log - matrixStats::logSumExp(w_T_log))
   
-  return(list(theta=theta[,n], theta_resamp=theta_resamp))
+  U <- runif(1, 0, 1)
+  A <- Sys_resamp(W = W_T, P = N, U = U)
+  theta[,n] <- theta[A,n]
+  
+  
+  return(list(theta=theta[,n], theta_resamp=theta_resamp, x_leaf=x_leaf))
   
 }
 
@@ -264,5 +277,5 @@ dc_smc_A1 <- function(data,
 
 debug(dc_smc_A1)
 
-out <- dc_smc_A1(data=y, N=2000, alpha=.2, Ntotal=50, prior_mu=0, prior_sigma=1)
+out <- dc_smc_A1(data=y, N=3000, alpha=.2, Ntotal=20, prior_mu=0, prior_sigma=1)
 

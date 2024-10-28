@@ -5,14 +5,14 @@ alpha <- rlnorm(1, 3, 2)
 alpha1 <- rgamma(1, alpha, 1)
 alpha2 <- rgamma(1, alpha, .5)
 
-p1 <- rbeta(30, alpha1, 2)
-p2 <- rbeta(30, alpha2, 10)
+p1 <- rbeta(50, alpha1, 2)
+p2 <- rbeta(50, alpha2, 10)
 
-y1 <- matrix(rep(NA, 20*30), ncol = 30)
-y2 <- matrix(rep(NA, 20*30), ncol = 30)
-for (i in 1:30) {
-  y1[,i] <- rbinom(20, 100, p1[i])
-  y2[,i] <- rbinom(20, 200, p2[i])
+y1 <- matrix(rep(NA, 50*50), ncol = 50)
+y2 <- matrix(rep(NA, 50*50), ncol = 50)
+for (i in 1:50) {
+  y1[,i] <- rbinom(50, 100, p1[i])
+  y2[,i] <- rbinom(50, 200, p2[i])
 }
 
 
@@ -27,8 +27,8 @@ source("C:/Users/Yixuan/Documents/codes/SMC/dc_smc/dc_smc_leaf_binom.R")
 source("C:/Users/Yixuan/Documents/codes/SMC/dc_smc/dc_smc_algB2_new.R")
 
 
-beta_prior <- list(alpha=rep(1, 60), beta=c(rep(2, 30), rep(10, 30)))
-n_trial <- c(rep(100, 30), rep(200, 30))
+beta_prior <- list(alpha=rep(1, 100), beta=c(rep(2, 50), rep(10, 50)))
+n_trial <- c(rep(100, 50), rep(200, 50))
 gamma_prior <- list(beta = c(1, .5))
 
 debug(dc_smc_algB2_new)
@@ -36,7 +36,7 @@ debug(dc_smc_algB2_new)
 out_smc <- dc_smc_algB2_new(data = data1, 
                         n_trial = n_trial,
                         N = 5000,
-                        nodes_n = c(1, 2, 60),
+                        nodes_n = c(1, 2, 100),
                         beta_prior = beta_prior,
                         gamma_prior = gamma_prior,
                         m = 2,

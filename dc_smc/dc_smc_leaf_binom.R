@@ -19,11 +19,8 @@ dc_smc_leaf_binom <- function(data, alpha, beta, n_trial, N) {
                                p=p_bin,
                                n_trial=n_trial,
                                min_lim=min_lim)
-  if (max(w_log) == min_lim) {
-    W <- rep(1/N, N)
-  } else {
-    W <- exp(w_log) / sum(exp(w_log))
-  }
+  
+  W <- exp(w_log - matrixStats::logSumExp(w_log))
   
   L_log <- sum(w_log) - log(N)
   
