@@ -33,7 +33,7 @@ model <- " model {
   psi1 ~ dgamma(1, 1)
   psi2 ~ dgamma(1, 1)
   
-  for (i in 1:5) {
+  for (i in 1:50) {
     y1[i] ~ dnorm(phi12, 1/psi1^2)
     y2[i] ~ dnorm(phi23, 1/psi2^2)
   }
