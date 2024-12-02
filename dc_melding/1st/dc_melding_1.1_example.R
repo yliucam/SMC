@@ -3,7 +3,7 @@ source("C:/Users/Yixuan/Documents/codes/SMC/dc_melding/1st/dc_melding_1.1.R")
 
 set.seed(12345)
 #psi3 <- rnorm(1, 1, 100)
-psi3 <- rnorm(1, 2, 2)
+psi3 <- rgamma(1, 8, 8)
 phi12 <- rnorm(1, psi3, 1)
 phi23 <- rnorm(1, psi3, 2)
 
