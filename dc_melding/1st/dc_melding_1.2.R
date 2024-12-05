@@ -26,6 +26,7 @@ dc_melding_1.2 <- function(data,
                            m,
                            alpha,
                            Ntotal) {
+  time_begin <- Sys.time()
   ESS_min <- N / 2
   min_lim <- log(.Machine$double.xmin)
   
@@ -102,12 +103,11 @@ dc_melding_1.2 <- function(data,
   for (i in 1:(nt-1)) {
     if (i == 1) {
       ### Update weights
-      p_root_log <- apply(cbind(x_leaf_merge, x_root_0), 1, function(x) dnorm(x[1], x[3], 1, log = T) + dnorm(x[2], x[3], 2, log = T))
-      for (j in 1:n) {
-        p_root_log <- p_root_log + sapply(x_root_0, function(x) dexp(data[j, 3], rate = x, log = T))
-      }
+      p_root_log <- normal_nodes_log_sum(x_leaf_merge, mu = x_root_0, sigma <- c(1, 2))
+      p_root_log <- p_root_log + exponential_psd_log_sum(data[,3], lambda = x_root_0)
       u_root_log <- sapply(x_root_0, function(x) dgamma(x, 1, 1, log = T))
-      u_c_log <- apply(x_leaf_merge, 1, function(x) dnorm(x[1], 0, 1, log = T) + dnorm(x[2], 0, 1, log = T))
+      u_c_log <- normal_nodes_log_sum(x_leaf_merge, mu = rep(0, N), sigma = rep(1, 2))
+      #u_c_log <- apply(x_leaf_merge, 1, function(x) dnorm(x[1], 0, 1, log = T) + dnorm(x[2], 0, 1, log = T))
       q_root_log <- u_root_log ## Set q_t to be the same as u_t
       w_root_log[,i] <- w_root_log_0 + alpha * (p_root_log + u_root_log - (1-alpha) * u_c_log - alpha * p_c_marginal_log - q_root_log)
       w_root_log[which(w_root_log[,i] < min_lim), i] <- min_lim
@@ -139,12 +139,11 @@ dc_melding_1.2 <- function(data,
     }
     
     ### Update weights
-    p_root_log <- apply(cbind(x_leaf_merge, x_root), 1, function(x) dnorm(x[1], x[3], 1, log = T) + dnorm(x[2], x[3], 2, log = T))
-    for (j in 1:n) {
-      p_root_log <- p_root_log + sapply(x_root, function(x) dexp(data[j, 3], rate = x, log = T))
-    }
+    p_root_log <- normal_nodes_log_sum(x_leaf_merge, mu = x_root, sigma = c(1, 2))
+    p_root_log <- p_root_log + exponential_psd_log_sum(data[,3], lambda = x_root)
     u_root_log <- sapply(x_root, function(x) dgamma(x, 1, 1, log = T))
-    u_c_log <- apply(x_leaf_merge, 1, function(x) dnorm(x[1], 0, 1, log = T) + dnorm(x[2], 0, 1, log = T))
+    u_c_log <- normal_nodes_log_sum(x_leaf_merge, mu = rep(0, N), sigma = rep(1, 2))
+    #u_c_log <- apply(x_leaf_merge, 1, function(x) dnorm(x[1], 0, 1, log = T) + dnorm(x[2], 0, 1, log = T))
     q_root_log <- u_root_log ## Set q_t to be the same as u_t
     w_root_log[,i+1] <- w_root_log[,i] + alpha * (p_root_log + u_root_log - (1-alpha) * u_c_log - alpha * p_c_marginal_log - q_root_log)
     w_root_log[which(w_root_log[,i+1] < min_lim), i+1] <- min_lim
@@ -175,5 +174,8 @@ dc_melding_1.2 <- function(data,
     x_root_array[,i+1] <- x_root
   }
   
-  return(list(x=x_root_array, W=W_root_array, x_leaf=x_leaf, x_leaf_merge=x_leaf_merge))
+  time_end <- Sys.time()
+  time_run <- time_end - time_begin
+  
+  return(list(x=x_root_array, W=W_root_array, x_leaf=x_leaf, x_leaf_merge=x_leaf_merge, running_time=time_run))
 }

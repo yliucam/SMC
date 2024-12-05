@@ -146,14 +146,10 @@ dc_melding_root_mcmc <- function(data, data_phi, Ntotal, mu_init, alpha_j) {
       prior_log <- sapply(mu_init, function(x) dgamma(x, 1, 1, log = T))
       prior_star_log <- sapply(mu_star, function(x) dgamma(x, 1, 1, log = T))
       
-      likelihood_phi_log <- likelihood_phi_star_log <- rep(NA, N)
-      likelihood_y_log <- likelihood_y_star_log <- rep(NA, N)
-      for (j in 1:N) {
-        likelihood_phi_log[j] <- dnorm(data_phi[j, 1], mu_init[j], 1, log = T) + dnorm(data_phi[j, 2], mu_init[j], 2, log = T)
-        likelihood_y_log[j] <- sum(sapply(data, function(x) dexp(x, rate = mu_init[j], log = T)))
-        likelihood_phi_star_log[j] <- dnorm(data_phi[j, 1], mu_star[j], 1, log = T) + dnorm(data_phi[j, 2], mu_star[j], 2, log = T)
-        likelihood_y_star_log[j] <- sum(sapply(data, function(x) dexp(x, rate = mu_star[j], log = T)))
-      }
+      likelihood_phi_log <- normal_nodes_log_sum(data_phi, mu = mu_init, sigma = c(1, 2))
+      likelihood_phi_star_log <- normal_nodes_log_sum(data_phi, mu = mu_star, sigma = c(1, 2))
+      likelihood_y_log <- exponential_psd_log_sum(data, lambda = mu_init)
+      likelihood_y_star_log <- exponential_psd_log_sum(data, lambda = mu_star)
       
       post_log <- prior_log + alpha_j * (likelihood_phi_log + likelihood_y_log)
       post_star_log <- prior_star_log + alpha_j * (likelihood_phi_star_log + likelihood_y_star_log)
@@ -179,14 +175,10 @@ dc_melding_root_mcmc <- function(data, data_phi, Ntotal, mu_init, alpha_j) {
     prior_log <- sapply(mu[,i], function(x) dgamma(x, 1, 1, log = T))
     prior_star_log <- sapply(mu_star, function(x) dgamma(x, 1, 1, log = T))
     
-    likelihood_phi_log <- likelihood_phi_star_log <- rep(NA, N)
-    likelihood_y_log <- likelihood_y_star_log <- rep(NA, N)
-    for (j in 1:N) {
-      likelihood_phi_log[j] <- dnorm(data_phi[j, 1], mu[j,i], 1, log = T) + dnorm(data_phi[j, 2], mu[j,i], 2, log = T)
-      likelihood_y_log[j] <- sum(sapply(data, function(x) dexp(x, rate = mu[j,i], log = T)))
-      likelihood_phi_star_log[j] <- dnorm(data_phi[j, 1], mu_star[j], 1, log = T) + dnorm(data_phi[j, 2], mu_star[j], 2, log = T)
-      likelihood_y_star_log[j] <- sum(sapply(data, function(x) dexp(x, rate = mu_star[j], log = T)))
-    }
+    likelihood_phi_log <- normal_nodes_log_sum(data_phi, mu = mu[,i], sigma = c(1, 2))
+    likelihood_phi_star_log <- normal_nodes_log_sum(data_phi, mu = mu_star, sigma = c(1, 2))
+    likelihood_y_log <- exponential_psd_log_sum(data, lambda = mu[,i])
+    likelihood_y_star_log <- exponential_psd_log_sum(data, lambda = mu_star)
     
     post_log <- prior_log + alpha_j * (likelihood_phi_log + likelihood_y_log)
     post_star_log <- prior_star_log + alpha_j * (likelihood_phi_star_log + likelihood_y_star_log)
