@@ -82,11 +82,10 @@ dc_melding_1.1 <- function(data,
   
   
   ## Computing weights for all mN matchings
-  p_c_prod_log_mN <- rowSums(w_leaf_log_mN)
   x_leaf_mN_means <- colMeans(x_leaf_mN)
+  u_c_log_mN <- apply(x_leaf_mN, 1, function(x) dnorm(x[1], 0, 1, log = T) + dnorm(x[2], 0, 1, log = T))
   p_c_marginal_log_mN <- apply(x_leaf_mN, 1, function(x) dnorm(x[1], x_leaf_mN_means[1], 1, log = T) + dnorm(x[2], x_leaf_mN_means[2], 2, log = T))
-  p_check_log_mN <- alpha*p_c_prod_log_mN + (1-alpha)*p_c_marginal_log_mN
-  V_log <- p_check_log_mN - p_c_prod_log_mN
+  V_log <- alpha * (p_c_marginal_log_mN - u_c_log_mN)
   V_log[which(V_log < min_lim)] <- min_lim
   V <- exp(V_log)
   V <- V / sum(V)
@@ -95,7 +94,6 @@ dc_melding_1.1 <- function(data,
   U <- runif(1, 0, 1)
   A <- Sys_resamp(W=V, P=N, U=U)
   x_leaf_merge <- x_leaf_mN[A,]
-  p_check_log <- p_check_log_mN[A]
   p_c_marginal_log <- p_c_marginal_log_mN[A]
   
   # Root
@@ -113,7 +111,7 @@ dc_melding_1.1 <- function(data,
       u_root_log <- sapply(x_root_0, function(x) dgamma(x, 1, 1, log = T))
       u_c_log <- apply(x_leaf_merge, 1, function(x) dnorm(x[1], 0, 1, log = T) + dnorm(x[2], 0, 1, log = T))
       q_root_log <- u_root_log ## Set q_t to be the same as u_t
-      w_root_log[,i] <- w_root_log_0 + alpha * (p_root_log + u_root_log - p_c_marginal_log - q_root_log) - (1-alpha) * u_c_log
+      w_root_log[,i] <- w_root_log_0 + alpha * (p_root_log + u_root_log - (1-alpha) * u_c_log - alpha * p_c_marginal_log - q_root_log)
       w_root_log[which(w_root_log[,i] < min_lim), i] <- min_lim
       W_root <- exp(w_root_log[,i] - matrixStats::logSumExp(w_root_log[,i]))
       W_root_array[,i] <- W_root
@@ -126,6 +124,7 @@ dc_melding_1.1 <- function(data,
         x_root_resamp <- x_root_0[A]
         x_leaf_merge <- x_leaf_merge[A,]
         u_c_log <- u_c_log[A]
+        p_c_marginal_log <- p_c_marginal_log[A]
         w_root_log[,i] <- rep(0, N)
         A_root[,i] <- A
       } else {
@@ -144,9 +143,9 @@ dc_melding_1.1 <- function(data,
     ### Update weights
     p_root_log <- apply(cbind(x_leaf_merge, x_root), 1, function(x) dnorm(x[1], x[3], 1, log = T) + dnorm(x[2], x[3], 2, log = T))
     u_root_log <- sapply(x_root, function(x) dgamma(x, 1, 1, log = T))
-    u_c_log <- u_c_log
+    u_c_log <- apply(x_leaf_merge, 1, function(x) dnorm(x[1], 0, 1, log = T) + dnorm(x[2], 0, 1, log = T))
     q_root_log <- u_root_log ## Set q_t to be the same as u_t
-    w_root_log[,i+1] <- w_root_log[,i] + alpha * (p_root_log + u_root_log - p_c_marginal_log - q_root_log) - (1-alpha) * u_c_log
+    w_root_log[,i+1] <- w_root_log[,i] + alpha * (p_root_log + u_root_log - (1-alpha) * u_c_log - alpha * p_c_marginal_log - q_root_log)
     w_root_log[which(w_root_log[,i+1] < min_lim), i+1] <- min_lim
     W_root <- exp(w_root_log[,i+1] - matrixStats::logSumExp(w_root_log[,i+1]))
     W_root_array[,i+1] <- W_root
@@ -159,6 +158,7 @@ dc_melding_1.1 <- function(data,
       x_root_resamp <- x_root[A]
       x_leaf_merge <- x_leaf_merge[A,]
       u_c_log <- u_c_log[A]
+      p_c_marginal_log <- p_c_marginal_log[A]
       w_root_log[,i+1] <- rep(0, N)
       A_root[,i+1] <- A
     } else {
