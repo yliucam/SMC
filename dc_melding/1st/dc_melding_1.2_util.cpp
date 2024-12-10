@@ -43,3 +43,25 @@ arma::vec normal_nodes_log_sum(arma::mat data,
   return res;
 }
 
+
+//[[Rcpp::export]]
+arma::vec normal_nodes_log_sum_new(arma::mat data,
+                               arma::mat mu,
+                               arma::mat sigma) {
+  const int N = data.n_rows;
+  const int d = data.n_cols;
+  
+  arma::vec res(N, arma::fill::zeros);
+  
+  for (int i=0; i<N; ++i) {
+    for (int j=0; j<d; ++j) {
+      res(i) = res(i) + R::dnorm(data(i,j), mu(i,j), sigma(i,j), TRUE);
+    }
+  }
+  
+  return res;
+}
+
+
+
+
