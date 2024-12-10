@@ -21,6 +21,53 @@ out <- dc_melding_1.1(data=cbind(y1, y2),
                       alpha=.05, 
                       Ntotal=50)
 
+# Convert dc_melding output to format for ggplot
+library(tidyverse)
+colnames(out$x) <- paste0("root_", 1:20)
+root_df <- as_tibble(out$x) |>
+  pivot_longer(cols = everything(),
+               names_to = c("node", "step"),
+               names_sep = "_") |>
+  mutate(step = factor(step, levels = 1:20))
+
+colnames(out$x_leaf) <- c("phi12", "phi23")
+leaf_df1 <- as_tibble(out$x_leaf) |>
+  pivot_longer(cols = everything()) |>
+  mutate(type = "marginal")
+
+colnames(out$x_leaf_merge) <- c("phi12", "phi23")
+leaf_df2 <- as_tibble(out$x_leaf_merge) |>
+  pivot_longer(cols = everything()) |>
+  mutate(type = "postVresample")
+
+leaf_df <- bind_rows(leaf_df1, leaf_df2)
+
+# Pretty histogram plots
+library(colorspace)
+geom_histogram_outline <- function(alpha = 0.3, ...){
+  list(geom_histogram(colour = NA,
+                      alpha = alpha,
+                      position = "identity",
+                      ...),
+       geom_step(aes(y = after_stat(count),
+                     colour = after_scale(colorspace::darken(fill, 0.1))),
+                 stat = "bin",
+                 pad = TRUE,
+                 direction = "mid",
+                 ...))
+}
+
+# Compare original samples (x_leaf) and post merge samples (x_leaf_merge)
+# for phi12 and phi23
+ggplot(leaf_df, aes(x = value, fill = type)) +
+  facet_grid(rows = vars(name)) +
+  geom_histogram_outline(origin = 0, binwidth = 0.1)
+
+# Assess evolution of the phi3 samples (x) for the root through the tempering
+# SMC steps
+ggplot(root_df, aes(x = value, fill = step)) +
+  facet_grid(rows = "step") +
+  geom_histogram_outline(alpha = 0.4, binwidth = 0.2)
 
 
 library(rjags)
