@@ -1,0 +1,6 @@
+recap_f_a <- read.table("C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/data/capRecapFemaleAdult.dat")
+recap_f_j <- read.table("C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/data/capRecapFemaleFirst.dat")
+recap_m_a <- read.table("C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/data/capRecapMaleAdult.dat")
+recap_m_j <- read.table("C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/data/capRecapMaleFirst.dat")
+count <- read.table("C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/data/count.dat")
+fecundity <- read.table("C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/data/fecundity.dat")
