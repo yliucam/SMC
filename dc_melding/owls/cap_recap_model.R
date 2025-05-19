@@ -45,15 +45,12 @@ cap_recap_model <- function(data_f_j,
     ##------------------------------------------------------------##
     ### Rate for juveniles ###
     for (i in 1:(ti-1)) {
-      #RjF[i] <- sum(MjF[i, 1:ti])
       MjF[i, 1:ti] ~ dmulti(QjF[i, 1:ti], RjF[i])
       qF[i] <- 1 - pF[i]  # 1 - pi
     }
     
     #### Definition on QjF ####
     for (i in 1:(ti-1)) {
-      ###qF[i] <- 1 - pF[i]  # 1 - pi -- or it should be qF <- 1 - pF outside the loop???
-      
       # Main diagonal
       QjF[i, i] <- deltajF * pF[i]
       
@@ -74,14 +71,11 @@ cap_recap_model <- function(data_f_j,
     
     ### Rate for adults ###
     for (i in 1:(ti-1)) {
-      #RaF[i] <- sum(MaF[i, 1:ti])
       MaF[i, 1:ti] ~ dmulti(QaF[i, 1:ti], RaF[i])
     }
     
     #### Definition on QaF ####
     for (i in 1:(ti-1)) {
-      ###qF[i] <- 1 - pF[i]  # Do I need define here again?
-      
       # Main diagonal
       QaF[i, i] <- deltaaF * pF[i]
       
@@ -106,15 +100,12 @@ cap_recap_model <- function(data_f_j,
     ##------------------------------------------------------------##
     ### Rate for juveniles ###
     for (i in 1:(ti-1)) {
-      #RjM[i] <- sum(MjM[i, 1:ti])
       MjM[i, 1:ti] ~ dmulti(QjM[i, 1:ti], RjM[i])
       qM[i] <- 1 - pM[i]
     }
     
     #### Definition on QjM ####
     for (i in 1:(ti-1)) {
-      ###qM[i] <- 1 - pM[i]  # 1 - pi -- or it should be qM = 1 - pM outside the loop???
-      
       # Main diagonal
       QjM[i, i] <- deltajM * pM[i]
       
@@ -135,14 +126,11 @@ cap_recap_model <- function(data_f_j,
     
     ### Rate for adults ###
     for (i in 1:(ti-1)) {
-      #RaM[i] <- sum(MaM[i, 1:ti])
       MaM[i, 1:ti] ~ dmulti(QaM[i, 1:ti], RaM[i])
     }
     
     #### Definition on QaF ####
     for (i in 1:(ti-1)) {
-      ###qM[i] <- 1 - pM[i]  # Do I need define here again?
-      
       # Main diagonal
       QaM[i, i] <- deltaaM * pM[i]
       
