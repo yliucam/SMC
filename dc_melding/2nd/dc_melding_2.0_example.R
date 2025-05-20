@@ -11,7 +11,7 @@ set.seed(12345)
 psi1 <- rgamma(1, 10, 5)
 psi3 <- rgamma(1, 5, 1)
 
-psi2 <- rgamma(1, 5, 10)
+psi2 <- rgamma(1, 1, 10)
 
 phi12 <- rnorm(1, 10, 5)
 phi23 <- rnorm(1, .1, 10)
@@ -27,7 +27,7 @@ out <- dc_melding_2.0(data = list(y1=y1, y2=y2, y3=y3),
                       N = 5000,
                       n_sub = 2,
                       m = 3000,
-                      alpha = .01,
+                      alpha = .02,
                       lambda = c(1, 1, 1),
                       mu_phi_uni = c(0, 0),
                       sigma_phi_uni = c(1e3, 1e3),

@@ -140,21 +140,32 @@ dc_melding_2.0 <- function(data,
         A_common[,i] <- A
       } else {
         psi2_resamp <- psi2_0
+        phi_sub_merged_array[,,i+1] <- phi_sub_merged
       }
       
       ### Update alpha
       alpha_update <- alpha
       
       ### MCMC kernel
-      invisible(capture.output(out_common <- dc_melding_SMC_jags(data = data2,
-                                                                 phi = rowSums(phi_sub_merged),
-                                                                 psi_alpha=psi_alpha,
-                                                                 psi_beta=psi_beta,
-                                                                 psi2_init = psi2_resamp,
-                                                                 alpha = alpha_update,
-                                                                 N = N,
-                                                                 Ntotal = Ntotal)))
-      psi2 <- out_common[,Ntotal]
+      #invisible(capture.output(out_common <- dc_melding_SMC_jags(data = data2,
+      #                                                           phi = rowSums(phi_sub_merged),
+      #                                                           psi_alpha=psi_alpha,
+      #                                                           psi_beta=psi_beta,
+      #                                                           psi2_init = psi2_resamp,
+      #                                                           alpha = alpha_update,
+      #                                                           N = N,
+      #                                                           Ntotal = Ntotal)))
+      
+      out_common <- dc_melding_smc_mcmc(data = data2,
+                                        phi = rowSums(phi_sub_merged),
+                                        psi_alpha=psi_alpha,
+                                        psi_beta=psi_beta,
+                                        sigma_init = psi2_resamp,
+                                        alpha_j = alpha_update,
+                                        N = N,
+                                        Ntotal = Ntotal)
+      
+      psi2 <- out_common$sigma[,Ntotal]
       psi2_array[,i] <- psi2
     }
     
@@ -185,21 +196,30 @@ dc_melding_2.0 <- function(data,
       A_common[,i+1] <- A
     } else {
       psi2_resamp <- psi2
+      phi_sub_merged_array[,,i+2] <- phi_sub_merged
     }
     
     ### Update alpha
     alpha_update <- alpha_update + alpha
     
     ### MCMC kernel
-    invisible(capture.output(out_common <- dc_melding_SMC_jags(data = data2,
-                                                               phi = rowSums(phi_sub_merged),
-                                                               psi_alpha=psi_alpha,
-                                                               psi_beta=psi_beta,
-                                                               psi2_init = psi2_resamp,
-                                                               alpha = alpha_update,
-                                                               N = N,
-                                                               Ntotal = Ntotal)))
-    psi2 <- out_common[,Ntotal]
+    #invisible(capture.output(out_common <- dc_melding_SMC_jags(data = data2,
+    #                                                           phi = rowSums(phi_sub_merged),
+    #                                                           psi_alpha=psi_alpha,
+    #                                                           psi_beta=psi_beta,
+    #                                                           psi2_init = psi2_resamp,
+    #                                                           alpha = alpha_update,
+    #                                                           N = N,
+    #                                                           Ntotal = Ntotal)))
+    out_common <- dc_melding_smc_mcmc(data = data2,
+                                      phi = rowSums(phi_sub_merged),
+                                      psi_alpha=psi_alpha,
+                                      psi_beta=psi_beta,
+                                      sigma_init = psi2_resamp,
+                                      alpha_j = alpha_update,
+                                      N = N,
+                                      Ntotal = Ntotal)
+    psi2 <- out_common$sigma[,Ntotal]
     psi2_array[,i+1] <- psi2
   }
   

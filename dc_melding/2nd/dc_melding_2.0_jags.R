@@ -91,9 +91,11 @@ dc_melding_SMC_jags <- function(data,
   model <- "model {
     for (i in 1:n) {
       z[i] ~ dpois(phi[i])
-      phi[i] <- alpha * log(2*3.14159*sigma) + alpha * .5 * pow((y[i] - mu)/sigma, 2)
+      loglik[i] <- logdensity.norm(y[i], mu, tau)
+      phi[i] <- -alpha * loglik[i] + 100
     }
     
+    tau <- pow(sigma, -2)
     sigma ~ dgamma(psi_alpha, psi_beta)
   }
   "
