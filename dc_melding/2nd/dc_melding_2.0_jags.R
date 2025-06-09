@@ -11,10 +11,12 @@ dc_melding_sub_jags <- function(data,
   
   model <- "model {
     
-    phi12 ~ dnorm(mu1, tau_phi1)
-    phi23 ~ dnorm(mu2, tau_phi2)
-    tau_phi1 <- pow(sigma1, -2)
-    tau_phi2 <- pow(sigma2, -2)
+    #phi12 ~ dnorm(mu1, tau_phi1)
+    #phi23 ~ dnorm(mu2, tau_phi2)
+    #tau_phi1 <- pow(sigma1, -2)
+    #tau_phi2 <- pow(sigma2, -2)
+    phi12 ~ dunif(-1000, 1000)
+    phi23 ~ dunif(-1000, 1000)
     
     psi1 ~ dgamma(1, 1)
     psi3 ~ dgamma(1, 1)
