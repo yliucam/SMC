@@ -2,6 +2,9 @@ N <- 8000
 m <- 100
 n_sub <- 3
 
+alpha <- .2
+nt <- 1/alpha
+
 para_sub <- cbind(t(out_recap$alpha[50,c(1,3),]), out_fec$rho[,50])
 lambda <- c(1, 1, 1)
 
@@ -36,6 +39,21 @@ para_sub_merged <- para_sub_mN[A,]
 
 u_pooling_log <- u_pooling_log_mN[A]
 p_approx_log <- p_approx_log[A]
+
+
+alpha6_0 <- rep(0, N)
+xJ_0 <- rep(10, N)
+sur_0 <- rep(5, N)
+imm_0 <- rep(5, N)
+
+w_common_log_0 <- rep(0, N)
+
+
+for (i in 1:(nt-1)) {
+  if (i == 1) {
+    p_common_log
+  }
+}
 
 
 
