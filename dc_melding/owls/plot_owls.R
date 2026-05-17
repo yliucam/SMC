@@ -504,7 +504,7 @@ alpha6_sub_long <- data.frame(
 
 alpha6_sub_boxplot <- ggplot(alpha6_sub_long, aes(x = method, y = value, fill = method)) +
   geom_boxplot(width = 0.5, alpha = 0.7) +
-  coord_flip() +   # <-- makes boxes horizontal
+  # coord_flip() +   # <-- makes boxes horizontal
   scale_fill_manual(
     values = c("p2" = "lightpink",
                "ipm" = "grey30"),
@@ -512,13 +512,19 @@ alpha6_sub_boxplot <- ggplot(alpha6_sub_long, aes(x = method, y = value, fill = 
                "ipm"=expression(p[ipm]))
   ) +
   labs(x = NULL, y = expression(alpha[6]), fill = 'Model') +
+  scale_y_continuous(position = "right") +
   scale_x_discrete(labels = NULL) +
   #theme_minimal(base_size = 16) +
   theme(axis.text = element_text(size = 20),
-        axis.title.x = element_text(size = 40),
-        legend.text = element_text(size = 40),
-        legend.title = element_text(size = 40),
+        axis.title.y.right = element_text(size = 40,
+                                          angle = 0,
+                                          vjust = 0.5,
+                                          hjust = 0.5,
+                                          margin = margin(l = 20)),
+        legend.text = element_text(size = 50),
+        legend.title = element_text(size = 50),
         legend.spacing.y = unit(.5, "cm"),
+        legend.position = "left",
         panel.grid.major.y = element_blank())
 
 
@@ -557,7 +563,10 @@ alpha6_boxplot <- ggplot(alpha6_long, aes(x = method, y = value, fill = method))
   scale_x_discrete(labels = NULL) +
   #theme_minimal(base_size = 16) +
   theme(axis.text = element_text(size = 20),
-        axis.title.y = element_text(size = 40),
+        axis.title.y = element_text(size = 40, 
+                                    angle = 0,
+                                    vjust = 0.5,
+                                    margin = margin(r = 15)),
         legend.text = element_text(size = 40),
         legend.title = element_text(size = 40),
         legend.spacing.y = unit(.5, "cm"),
