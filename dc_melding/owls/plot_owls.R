@@ -8,8 +8,9 @@ library(tidyr)
 
 
 original_model_samples <- readRDS("C:/Users/Yixuan/Documents/codes/SMC/melding/owls/result/original-ipm-samples.rds")
-stage_one_recap_samples <- readRDS("C:/Users/Yixuan/Documents/codes/SMC/melding/owls/result/capture-recapture-subposterior-samples.rds")
-stage_one_fec_samples <- readRDS("C:/Users/Yixuan/Documents/codes/SMC/melding/owls/result/fecundity-subposterior-samples.rds")
+sub1_samples <- readRDS("C:/Users/Yixuan/Documents/codes/SMC/melding/owls/result/capture-recapture-subposterior-samples.rds")
+sub3_samples <- readRDS("C:/Users/Yixuan/Documents/codes/SMC/melding/owls/result/fecundity-subposterior-samples.rds")
+sub2_samples <- readRDS("C:/Users/Yixuan/Documents/codes/SMC/melding/owls/result/count-data-subposterior-samples.rds")
 stage_two_samples <- readRDS("C:/Users/Yixuan/Documents/codes/SMC/melding/owls/result/melded-posterior-samples.rds")
 vars <- c("fec", "v[1]", "v[2]", "v[6]")
 orig_samples_slim <- array(
@@ -36,22 +37,34 @@ meld_samples_slim <- array(
   )
 )
 
-meld_recap_samples_slim <- array(
-  stage_one_recap_samples[,,c("v[1]", "v[2]")],
+sub2_samples_slim <- array(
+  sub2_samples[,,vars],
   dim = c(
-    dim(stage_one_recap_samples)[1] * dim(stage_one_recap_samples)[2],
+    dim(sub2_samples)[1] * dim(sub2_samples)[2],
+    4
+  ),
+  dimnames = list(
+    NULL,
+    vars
+  )
+)
+
+sub1_samples_slim <- array(
+  sub1_samples[,,vars[2:3]],
+  dim = c(
+    dim(sub1_samples)[1] * dim(sub1_samples)[2],
     2
   ),
   dimnames = list(
     NULL,
-    c("v[1]", "v[2]")
+    vars[2:3]
   )
 )
 
-meld_fec_samples_slim <- array(
-  stage_one_fec_samples[,,"rho"],
+sub3_samples_slim <- array(
+  sub3_samples,
   dim = c(
-    dim(stage_one_fec_samples)[1] * dim(stage_one_fec_samples)[2],
+    dim(sub3_samples)[1] * dim(sub3_samples)[2],
     1
   ),
   dimnames = list(
@@ -60,8 +73,9 @@ meld_fec_samples_slim <- array(
   )
 )
 
-load("C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/results/submodel2_mcmc.RData")
-submodel2_mcmc <- out_jags
+
+# load("C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/results/submodel2_mcmc.RData")
+# submodel2_mcmc <- out_jags
 
 load("C:/Users/Yixuan/Documents/codes/SMC/melding/owls/result/pointwise_results.RData")
 pointwise_sample <- out_jags2
@@ -74,40 +88,47 @@ load("C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/results/fecundity_resu
 
 
 
-alpha0_dcm_stage_one <- out_recap$alpha[50,1,]
+#alpha0_dcm_stage_one <- out_recap$alpha[50,1,]
+alpha0_sub1 <- sub1_samples_slim[,"v[1]"]
+alpha0_sub2 <- sub2_samples_slim[,"v[1]"]
 alpha0_dcm <- dc_melding_sample$phi[,1,2]
-alpha0_m_stage_one <- meld_recap_samples_slim[,"v[1]"]
+#alpha0_m_stage_one <- meld_recap_samples_slim[,"v[1]"]
 alpha0_m <- meld_samples_slim[,"v[1]"]
 alpha0_ipm <- orig_samples_slim[,"v[1]"]
-alpha0_sub2_mcmc <- submodel2_mcmc[,"alpha0"]
-alpha0 <- cbind(alpha0_dcm_stage_one, alpha0_dcm, alpha0_m, alpha0_ipm, alpha0_sub2_mcmc)
-alpha0 <- data.frame(alpha0)
-colnames(alpha0) <- c("dc_melding stage one", "dc_melding", "melding", "ipm", "submodel 2")
+# alpha0_sub2_mcmc <- submodel2_mcmc[,"alpha0"]
+# alpha0 <- cbind(alpha0_dcm_stage_one, alpha0_dcm, alpha0_m, alpha0_ipm, alpha0_sub2_mcmc)
+# alpha0 <- data.frame(alpha0)
+# colnames(alpha0) <- c("dc_melding stage one", "dc_melding", "melding", "ipm", "submodel 2")
 
-alpha2_dcm_stage_one <- out_recap$alpha[50,3,]
+#alpha2_dcm_stage_one <- out_recap$alpha[50,3,]
+alpha2_sub1 <- sub1_samples_slim[,"v[2]"]
+alpha2_sub2 <- sub2_samples_slim[,"v[2]"]
 alpha2_dcm <- dc_melding_sample$phi[,2,2]
-alpha2_m_stage_one <- meld_recap_samples_slim[,"v[2]"]
+#alpha2_m_stage_one <- meld_recap_samples_slim[,"v[2]"]
 alpha2_m <- meld_samples_slim[,"v[2]"]
 alpha2_ipm <- orig_samples_slim[,"v[2]"]
-alpha2_sub2_mcmc <- submodel2_mcmc[,"alpha2"]
-alpha2 <- cbind(alpha2_dcm_stage_one, alpha2_dcm, alpha2_m, alpha2_ipm, alpha2_sub2_mcmc)
-alpha2 <- data.frame(alpha2)
-colnames(alpha2) <- c("dc_melding stage one", "dc_melding", "melding", "ipm", "submodel 2")
+# alpha2_sub2_mcmc <- submodel2_mcmc[,"alpha2"]
+# alpha2 <- cbind(alpha2_dcm_stage_one, alpha2_dcm, alpha2_m, alpha2_ipm, alpha2_sub2_mcmc)
+# alpha2 <- data.frame(alpha2)
+# colnames(alpha2) <- c("dc_melding stage one", "dc_melding", "melding", "ipm", "submodel 2")
 
-rho_dcm_stage_one <- out_fec$rho[,11]
+#rho_dcm_stage_one <- out_fec$rho[,11]
+rho_sub3 <- sub3_samples_slim[,"fec"]
+rho_sub2 <- sub2_samples_slim[,"fec"]
 rho_dcm <- dc_melding_sample$phi[,3,2]
-rho_m_stage_one <- meld_fec_samples_slim[,"fec"]
+#rho_m_stage_one <- meld_fec_samples_slim[,"fec"]
 rho_m <- meld_samples_slim[,"fec"]
 rho_ipm <- orig_samples_slim[,"fec"]
-rho_sub2_mcmc <- submodel2_mcmc[,"rho"]
-rho <- cbind(rho_dcm_stage_one, rho_dcm, rho_m, rho_ipm, rho_sub2_mcmc)
-rho <- data.frame(rho)
-colnames(rho) <- c("dc_melding stage one", "dc_melding", "melding", "ipm", "submodel 2")
+# rho_sub2_mcmc <- submodel2_mcmc[,"rho"]
+# rho <- cbind(rho_dcm_stage_one, rho_dcm, rho_m, rho_ipm, rho_sub2_mcmc)
+# rho <- data.frame(rho)
+# colnames(rho) <- c("dc_melding stage one", "dc_melding", "melding", "ipm", "submodel 2")
 
+alpha6_sub2 <- sub2_samples_slim[,"v[6]"]
 alpha6_dcm <- dc_melding_sample$psi2$alpha6[,3]
 alpha6_m <- meld_samples_slim[,"v[6]"]
 alpha6_ipm <- orig_samples_slim[,"v[6]"]
-alpha6_sub2_mcmc <- submodel2_mcmc[,"alpha6"]
+# alpha6_sub2_mcmc <- submodel2_mcmc[,"alpha6"]
 alpha6_pointwise <- pointwise_sample[,"alpha6"]
 
 
@@ -237,85 +258,144 @@ dev.off()
 
 #---------------------------box-plot------------------------------------#
 
-##-----------------------stage_one---------------------------##
-alpha0_stage_one_long <- data.frame(
-  value = c(alpha0_dcm_stage_one, alpha0_m_stage_one, alpha0_ipm, alpha0_sub2_mcmc),
+##-----------------------individual_submodels---------------------------##
+alpha0_sub_long <- data.frame(
+  value = c(alpha0_sub1, alpha0_sub2, alpha0_ipm),
   method = factor(rep(
-    c("dc_melding", "melding", "ipm", "sub 2 only"),
-    times = c(length(alpha0_dcm_stage_one),
-              length(alpha0_m_stage_one),
-              length(alpha0_ipm),
-              length(alpha0_sub2_mcmc))
+    c("p1", "p2", "ipm"),
+    times = c(length(alpha0_sub1),
+              length(alpha0_sub2),
+              length(alpha0_ipm))
   ))
 )
 
 
-alpha2_stage_one_long <- data.frame(
-  value = c(alpha2_dcm_stage_one, alpha2_m_stage_one, alpha2_ipm, alpha2_sub2_mcmc),
+alpha2_sub_long <- data.frame(
+  value = c(alpha2_sub1, alpha0_sub2, alpha2_ipm),
   method = factor(rep(
-    c("dc_melding", "melding", "ipm", "sub 2 only"),
-    times = c(length(alpha2_dcm_stage_one),
-              length(alpha2_m_stage_one),
-              length(alpha2_ipm),
-              length(alpha2_sub2_mcmc))
+    c("p1", "p2", "ipm"),
+    times = c(length(alpha0_sub1),
+              length(alpha0_sub2),
+              length(alpha0_ipm))
   ))
 )
 
 
-rho_stage_one_long <- data.frame(
-  value = c(rho_dcm_stage_one, rho_m_stage_one, rho_ipm, rho_sub2_mcmc),
+rho_sub_long <- data.frame(
+  value = c(rho_sub2, rho_sub3, rho_ipm),
   method = factor(rep(
-    c("dc_melding", "melding", "ipm", "sub 2 only"),
-    times = c(length(rho_dcm_stage_one),
-              length(rho_m_stage_one),
-              length(rho_ipm),
-              length(rho_sub2_mcmc))
+    c("p2", "p3", "ipm"),
+    times = c(length(rho_sub2),
+              length(rho_sub3),
+              length(rho_ipm))
   ))
 )
 
 
-alpha0_stage_one_boxplot <- ggplot(alpha0_stage_one_long, aes(x = method, y = value, fill = method)) +
+# Common set of levels for ALL plots (even if some are absent in a given plot)
+fill_levels1 <- c("p1","p2","ipm")
+fill_levels2 <- c("p2","p3","ipm")
+
+fill_scale_common1 <- scale_fill_manual(
+  values = c("p1"="olivedrab3", "p2"="lightpink", "ipm"="grey10"),
+  labels = c("p1"=expression(p[1]),
+             "p2"=expression(p[2]),
+             "ipm"=expression(p[ipm])),
+  name = "Model"
+)
+
+fill_scale_common2 <- scale_fill_manual(
+  values = c("p2"="lightpink", "p3"="cyan3", "ipm"="grey10"),
+  labels = c("p2"=expression(p[2]),
+             "p3"=expression(p[3]),
+             "ipm"=expression(p[ipm])),
+  name = NULL
+)
+
+# Ensure factor levels are consistent
+alpha0_sub_long$method <- factor(alpha0_sub_long$method, levels = fill_levels1)
+alpha2_sub_long$method <- factor(alpha2_sub_long$method, levels = fill_levels1)
+rho_sub_long$method <- factor(rho_sub_long$method, levels = fill_levels2)
+
+# --- Keep legend ONLY on the first plot ---
+alpha0_sub_boxplot <- ggplot(alpha0_sub_long, aes(x = method, y = value, fill = method)) +
   geom_boxplot(width = 0.5, alpha = 0.7) +
-  coord_flip() +   # <-- makes boxes horizontal
-  labs(x = NULL, y = expression(alpha[0]), fill = 'Method') +
+  coord_flip() +
   scale_x_discrete(labels = NULL) +
-  #theme_minimal(base_size = 16) +
+  fill_scale_common1 +
+  guides(fill = guide_legend(nrow = 1)) +
+  labs(x = NULL, y = expression(alpha[0])) +
   theme(axis.text = element_text(size = 20),
         axis.title.x = element_text(size = 40),
-        legend.position = "none", panel.grid.major.y = element_blank())
+        panel.grid.major.y = element_blank(),
+        legend.position = "none")
 
-alpha2_stage_one_boxplot <- ggplot(alpha2_stage_one_long, aes(x = method, y = value, fill = method)) +
+# Hide legend on the others
+alpha2_sub_boxplot <- ggplot(alpha2_sub_long, aes(x = method, y = value, fill = method)) +
   geom_boxplot(width = 0.5, alpha = 0.7) +
-  coord_flip() +   # <-- makes boxes horizontal
-  labs(x = NULL, y = expression(alpha[2]), fill = 'Method') +
+  coord_flip() +
   scale_x_discrete(labels = NULL) +
-  #theme_minimal(base_size = 16) +
+  fill_scale_common1 +
+  labs(x = NULL, y = expression(alpha[2])) +
   theme(axis.text = element_text(size = 20),
         axis.title.x = element_text(size = 40),
-        legend.position = "none", panel.grid.major.y = element_blank())
+        panel.grid.major.y = element_blank(),
+        legend.position = "none")
 
-rho_stage_one_boxplot <- ggplot(rho_stage_one_long, aes(x = method, y = value, fill = method)) +
+rho_sub_boxplot <- ggplot(rho_sub_long, aes(x = method, y = value, fill = method)) +
   geom_boxplot(width = 0.5, alpha = 0.7) +
-  coord_flip() +   # <-- makes boxes horizontal
-  labs(x = NULL, y = expression(rho), fill = 'Method') +
+  coord_flip() +
   scale_x_discrete(labels = NULL) +
-  #theme_minimal(base_size = 16) +
+  fill_scale_common2 +
+  labs(x = NULL, y = expression(rho)) +
   theme(axis.text = element_text(size = 20),
         axis.title.x = element_text(size = 40),
-        legend.text = element_text(size = 40),
-        legend.title = element_text(size = 40),
-        legend.spacing.y = unit(.5, "cm"),
-        panel.grid.major.y = element_blank())
+        panel.grid.major.y = element_blank(),
+        legend.position = "none")
 
 
+fill_levels <- c("p1","p2","p3","ipm")
 
-pdf(file = "C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/results/owls_boxplot_stage_one_alpha_0.5.pdf", width = 18, height = 12)
+legend_df <- data.frame(
+  method = factor(fill_levels, levels = fill_levels),
+  x = 1, y = 1
+)
 
-(alpha0_stage_one_boxplot | alpha2_stage_one_boxplot | rho_stage_one_boxplot) +
-  plot_annotation(theme = theme(plot.title = element_text(size = 30, hjust = .5,
-                                                          face = "bold")))
+legend_plot <- ggplot(legend_df, aes(x, y, fill = method)) +
+  geom_boxplot() +
+  scale_fill_manual(
+    limits = fill_levels,
+    drop = FALSE,
+    values = c("p1"="olivedrab3", "p2"="lightpink", "p3"="cyan3", "ipm"="grey50"),
+    labels = c("p1"  = expression(p[1]),
+               "p2"  = expression(p[2]),
+               "p3"  = expression(p[3]),
+               "ipm" = expression(p[ipm])),
+    name = "Model "
+  ) +
+  guides(fill = guide_legend(nrow = 1, byrow = TRUE)) +
+  theme_void() +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 40),
+    legend.text  = element_text(size = 40),
+    # kill any remaining grey background/panel
+    panel.background = element_blank(),
+    plot.background  = element_blank(),
+  )
 
-dev.off()
+
+merged_plot <- legend_plot /
+  (alpha0_sub_boxplot | alpha2_sub_boxplot | rho_sub_boxplot) +
+  plot_layout(heights = c(.08, 1))
+
+ggsave(filename = "C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/results/owls_boxplot_stage_one_alpha_0.5.jpg",
+       plot = merged_plot,
+       width = 18,
+       height = 12,
+       units = "in",
+       dpi = 300)
+
 
 
 
@@ -355,6 +435,11 @@ rho_long <- data.frame(
 alpha0_boxplot <- ggplot(alpha0_long, aes(x = method, y = value, fill = method)) +
   geom_boxplot(width = 0.5, alpha = 0.7) +
   coord_flip() +   # <-- makes boxes horizontal
+  scale_fill_manual(
+    values = c("dc_melding" = "olivedrab3",
+               "melding"    = "cyan3",
+               "ipm"        = "grey30")
+  ) +
   labs(x = NULL, y = expression(alpha[0]), fill = 'Method') +
   scale_x_discrete(labels = NULL) +
   #theme_minimal(base_size = 16) +
@@ -365,6 +450,11 @@ alpha0_boxplot <- ggplot(alpha0_long, aes(x = method, y = value, fill = method))
 alpha2_boxplot <- ggplot(alpha2_long, aes(x = method, y = value, fill = method)) +
   geom_boxplot(width = 0.5, alpha = 0.7) +
   coord_flip() +   # <-- makes boxes horizontal
+  scale_fill_manual(
+    values = c("dc_melding" = "olivedrab3",
+               "melding"    = "cyan3",
+               "ipm"        = "grey30")
+  ) +
   labs(x = NULL, y = expression(alpha[2]), fill = 'Method') +
   scale_x_discrete(labels = NULL) +
   #theme_minimal(base_size = 16) +
@@ -375,6 +465,11 @@ alpha2_boxplot <- ggplot(alpha2_long, aes(x = method, y = value, fill = method))
 rho_boxplot <- ggplot(rho_long, aes(x = method, y = value, fill = method)) +
   geom_boxplot(width = 0.5, alpha = 0.7) +
   coord_flip() +   # <-- makes boxes horizontal
+  scale_fill_manual(
+    values = c("dc_melding" = "olivedrab3",
+               "melding"    = "cyan3",
+               "ipm"        = "grey30")
+  ) +
   labs(x = NULL, y = expression(rho), fill = 'Method') +
   scale_x_discrete(labels = NULL) +
   #theme_minimal(base_size = 16) +
@@ -388,10 +483,8 @@ rho_boxplot <- ggplot(rho_long, aes(x = method, y = value, fill = method)) +
 
 pdf(file = "C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/results/owls_boxplot_stage_two_alpha_0.5.pdf", width = 18, height = 12)
 
-(alpha0_boxplot | alpha2_boxplot | rho_boxplot) +
-  plot_annotation(theme = theme(plot.title = element_text(size = 30, hjust = .5,
-                                                          face = "bold")))
-
+(alpha0_boxplot | alpha2_boxplot | rho_boxplot)
+ 
 dev.off()
 
 
@@ -399,6 +492,46 @@ dev.off()
 
 
 ##--------------------------alpha_6------------------------------##
+alpha6_sub_long <- data.frame(
+  value = c(alpha6_sub2, alpha6_ipm),
+  method = factor(rep(
+    c("p2", "ipm"),
+    times = c(length(alpha6_sub2),
+              length(alpha6_ipm))
+  ))
+)
+
+
+alpha6_sub_boxplot <- ggplot(alpha6_sub_long, aes(x = method, y = value, fill = method)) +
+  geom_boxplot(width = 0.5, alpha = 0.7) +
+  coord_flip() +   # <-- makes boxes horizontal
+  scale_fill_manual(
+    values = c("p2" = "lightpink",
+               "ipm" = "grey30"),
+    labels = c("p2"=expression(p[2]),
+               "ipm"=expression(p[ipm]))
+  ) +
+  labs(x = NULL, y = expression(alpha[6]), fill = 'Model') +
+  scale_x_discrete(labels = NULL) +
+  #theme_minimal(base_size = 16) +
+  theme(axis.text = element_text(size = 20),
+        axis.title.x = element_text(size = 40),
+        legend.text = element_text(size = 40),
+        legend.title = element_text(size = 40),
+        legend.spacing.y = unit(.5, "cm"),
+        panel.grid.major.y = element_blank())
+
+
+pdf(file = "C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/results/owls_boxplot_alpha6_sub_alpha_0.5.pdf", width = 18, height = 12)
+
+alpha6_sub_boxplot
+
+dev.off()
+
+
+
+
+
 
 alpha6_long <- data.frame(
   value = c(alpha6_dcm, alpha6_m, alpha6_ipm, alpha6_pointwise),
@@ -414,6 +547,12 @@ alpha6_long <- data.frame(
 
 alpha6_boxplot <- ggplot(alpha6_long, aes(x = method, y = value, fill = method)) +
   geom_boxplot(width = 0.5, alpha = 0.7) +
+  scale_fill_manual(
+    values = c("dc_melding" = "olivedrab3",
+               "melding"    = "cyan3",
+               "ipm"        = "grey30",
+               "pointwise"  = "lightpink")
+  ) +
   labs(x = NULL, y = expression(alpha[6]), fill = 'Method') +
   scale_x_discrete(labels = NULL) +
   #theme_minimal(base_size = 16) +
@@ -426,10 +565,7 @@ alpha6_boxplot <- ggplot(alpha6_long, aes(x = method, y = value, fill = method))
 
 pdf(file = "C:/Users/Yixuan/Documents/codes/SMC/dc_melding/owls/results/owls_boxplot_alpha6_alpha_0.5.pdf", width = 18, height = 12)
 
-alpha6_boxplot +
-  plot_annotation(theme = theme(plot.title = element_text(size = 30, hjust = .5,
-                                                          face = "bold")))
-
+alpha6_boxplot
 
 dev.off()
 
