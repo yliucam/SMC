@@ -7,7 +7,8 @@ Markov melding using divide and conquer sequential Monte Carlo*
 
 ## **Owls example**
 
-[`data`](./owls/data) contains the data used in the owls example.
+[`data`](./dc_melding/owls/data) contains the data used in the owls
+example.
 
 Use `recap_run.R` to draw particles from the capture-recapture model
 $p_1$.
